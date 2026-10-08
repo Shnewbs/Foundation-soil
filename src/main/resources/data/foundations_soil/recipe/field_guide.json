@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " P ",
+    "PBP",
+    " P "
+  ],
+  "key": {
+    "P": { "item": "minecraft:paper" },
+    "B": { "item": "minecraft:book" }
+  },
+  "result": {
+    "id": "foundations_soil:field_guide",
+    "count": 1
+  }
+}

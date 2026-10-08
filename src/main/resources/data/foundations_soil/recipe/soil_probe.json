@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " C ",
+    " C ",
+    " L "
+  ],
+  "key": {
+    "C": {
+      "tag": "c:ingots/copper"
+    },
+    "L": {
+      "tag": "tfc:lumber"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "foundations_soil:soil_probe"
+  }
+}

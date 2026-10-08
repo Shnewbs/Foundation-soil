@@ -1,0 +1,29 @@
+Foundations Soil 0.0.3a.R5 — static validation
+================================================
+Date: 2026-09-22
+
+Validated patch scope:
+- shared TfcSoilSnapshot capture utility;
+- Field Ledger persistence schema 2 -> 3;
+- Field Guide Cell payload TFC min/max hydration fields;
+- live Soil HUD packet TFC soil/hydration/NPK fields;
+- Soil Probe detailed formatter;
+- network registrar 5 -> 6;
+- R4 Field Guide search/no-shadow changes preserved.
+
+TFC parity check:
+- Confirmed against TerraFirmaCraft 1.21.x source that FarmlandBlock#getHydrationTooltip computes:
+  current hydration via FarmlandBlock#getInstantHydration;
+  minimum/maximum rainfall hydration via ChunkData#getMinRainfallHydration / getMaxRainfallHydration;
+  min/max final hydration via FarmlandBlock#getInstantHydrationFromRainHydration.
+- Confirmed IFarmland nutrient values are [0,1] and the TFC hoe formats N/P/K as value * 100 with two decimals.
+
+Local Java validation:
+- JDK 21 javac syntax/type validation passed for every modified main source file.
+- Validation used the extracted project's compiled classes + NeoForge 21.1.250 artifacts and minimal compile-only stubs for external APIs unavailable in this container.
+- Modified SoilHudFormatterTest and FieldLedgerEntryTest also compile against the R5 main classes.
+
+Not executed here:
+- Full Gradle clean test build, because this container does not have the project's external Gradle dependency cache/network resolution.
+
+Run the updater's optional build step on the Windows project and send the output if Gradle reports anything unexpected.

@@ -1,0 +1,124 @@
+R2_STATIC_VALIDATION 123/123 PASS
+PASS — gradle_version_R2
+PASS — java_version_R2
+PASS — build_bootstrap_R2
+PASS — schema_3_3
+PASS — ledger_schema_1
+PASS — all_resource_json_parse — 52 JSON files
+PASS — exactly_5_barrel_recipes — biochar_suspension,compost_tea,lime_suspension,manure_slurry,sulfur_suspension
+PASS — recipe_exists_compost_tea
+PASS — recipe_type_compost_tea — tfc:barrel_sealed
+PASS — recipe_input_item_compost_tea — {'item': 'tfc:compost', 'count': 1}
+PASS — recipe_input_water_compost_tea — {'amount': 1000, 'fluid': 'minecraft:water'}
+PASS — recipe_output_compost_tea — {'amount': 1000, 'id': 'foundations_soil:compost_tea'}
+PASS — compost_tea_sealed_duration — 12000
+PASS — recipe_exists_manure_slurry
+PASS — recipe_type_manure_slurry — tfc:barrel_instant
+PASS — recipe_input_item_manure_slurry — {'item': 'foundations_soil:manure', 'count': 1}
+PASS — recipe_input_water_manure_slurry — {'amount': 1000, 'fluid': 'minecraft:water'}
+PASS — recipe_output_manure_slurry — {'amount': 1000, 'id': 'foundations_soil:manure_slurry'}
+PASS — recipe_exists_lime_suspension
+PASS — recipe_type_lime_suspension — tfc:barrel_instant
+PASS — recipe_input_item_lime_suspension — {'item': 'tfc:powder/lime', 'count': 1}
+PASS — recipe_input_water_lime_suspension — {'amount': 1000, 'fluid': 'minecraft:water'}
+PASS — recipe_output_lime_suspension — {'amount': 1000, 'id': 'foundations_soil:lime_suspension'}
+PASS — recipe_exists_sulfur_suspension
+PASS — recipe_type_sulfur_suspension — tfc:barrel_instant
+PASS — recipe_input_item_sulfur_suspension — {'item': 'tfc:powder/sulfur', 'count': 1}
+PASS — recipe_input_water_sulfur_suspension — {'amount': 1000, 'fluid': 'minecraft:water'}
+PASS — recipe_output_sulfur_suspension — {'amount': 1000, 'id': 'foundations_soil:sulfur_suspension'}
+PASS — recipe_exists_biochar_suspension
+PASS — recipe_type_biochar_suspension — tfc:barrel_instant
+PASS — recipe_input_item_biochar_suspension — {'item': 'foundations_soil:biochar', 'count': 1}
+PASS — recipe_input_water_biochar_suspension — {'amount': 1000, 'fluid': 'minecraft:water'}
+PASS — recipe_output_biochar_suspension — {'amount': 1000, 'id': 'foundations_soil:biochar_suspension'}
+PASS — exactly_4_tfc_transport_tag_files — ['usable_in_barrel', 'usable_in_blue_steel_bucket', 'usable_in_red_steel_bucket', 'usable_in_wooden_bucket']
+PASS — tag_usable_in_barrel_replace_false
+PASS — tag_usable_in_barrel_has_all_10 — 10 ids
+PASS — tag_usable_in_wooden_bucket_replace_false
+PASS — tag_usable_in_wooden_bucket_has_all_10 — 10 ids
+PASS — tag_usable_in_red_steel_bucket_replace_false
+PASS — tag_usable_in_red_steel_bucket_has_all_10 — 10 ids
+PASS — tag_usable_in_blue_steel_bucket_replace_false
+PASS — tag_usable_in_blue_steel_bucket_has_all_10 — 10 ids
+PASS — no_tfc_usable_in_jug
+PASS — no_tfc_hydrating
+PASS — c_liquid_amendments_has_all_10 — 10 ids
+PASS — bucket_model_loader_compost_tea
+PASS — bucket_model_parent_compost_tea
+PASS — bucket_model_fluid_compost_tea
+PASS — fluid_blockstate_compost_tea
+PASS — fluid_block_model_compost_tea
+PASS — lang_bucket_compost_tea
+PASS — lang_fluid_type_compost_tea
+PASS — lang_block_compost_tea
+PASS — bucket_model_loader_manure_slurry
+PASS — bucket_model_parent_manure_slurry
+PASS — bucket_model_fluid_manure_slurry
+PASS — fluid_blockstate_manure_slurry
+PASS — fluid_block_model_manure_slurry
+PASS — lang_bucket_manure_slurry
+PASS — lang_fluid_type_manure_slurry
+PASS — lang_block_manure_slurry
+PASS — bucket_model_loader_lime_suspension
+PASS — bucket_model_parent_lime_suspension
+PASS — bucket_model_fluid_lime_suspension
+PASS — fluid_blockstate_lime_suspension
+PASS — fluid_block_model_lime_suspension
+PASS — lang_bucket_lime_suspension
+PASS — lang_fluid_type_lime_suspension
+PASS — lang_block_lime_suspension
+PASS — bucket_model_loader_sulfur_suspension
+PASS — bucket_model_parent_sulfur_suspension
+PASS — bucket_model_fluid_sulfur_suspension
+PASS — fluid_blockstate_sulfur_suspension
+PASS — fluid_block_model_sulfur_suspension
+PASS — lang_bucket_sulfur_suspension
+PASS — lang_fluid_type_sulfur_suspension
+PASS — lang_block_sulfur_suspension
+PASS — bucket_model_loader_biochar_suspension
+PASS — bucket_model_parent_biochar_suspension
+PASS — bucket_model_fluid_biochar_suspension
+PASS — fluid_blockstate_biochar_suspension
+PASS — fluid_block_model_biochar_suspension
+PASS — lang_bucket_biochar_suspension
+PASS — lang_fluid_type_biochar_suspension
+PASS — lang_block_biochar_suspension
+PASS — 5_fluid_families_declared
+PASS — fluid_mapping_compost_tea
+PASS — fluid_mapping_manure_slurry
+PASS — fluid_mapping_lime_suspension
+PASS — fluid_mapping_sulfur_suspension
+PASS — fluid_mapping_biochar_suspension
+PASS — fluidtype_registry
+PASS — fluid_registry
+PASS — source_and_flowing_registration
+PASS — bucket_registration
+PASS — fluid_nonhydrating
+PASS — fluid_no_infinite_sources
+PASS — register_order_fluids_before_items
+PASS — item_fluid_capability
+PASS — simulate_before_execute
+PASS — creative_does_not_drain
+PASS — server_authority
+PASS — physical_to_agronomy_api
+PASS — container_provenance
+PASS — rollback_attempt
+PASS — client_only_event_subscriber
+PASS — water_render_textures
+PASS — fluid_tint_extension
+PASS — translucent_render_layer
+PASS — guide_mix_compost_tea
+PASS — guide_mix_manure_slurry
+PASS — guide_mix_liquid_lime
+PASS — guide_mix_sulfur_solution
+PASS — guide_mix_biochar_suspension
+PASS — guide_shows_mix_label
+PASS — selftest_physical_fluids
+PASS — command_lists_physical_fluid
+PASS — sulfur_display_suspension
+PASS — sulfur_form_suspension
+PASS — java_delimiter_scan
+PASS — readme_no_irrigation_ownership
+PASS — r2_testing_doc
+PASS — r2_physical_doc

@@ -1,0 +1,18 @@
+Foundations Soil 0.0.3a.R6 static validation
+============================================
+Date: 2026-09-22
+
+Validation completed in the build container:
+
+PASS - R5 payloads were applied to the supplied Soil.rar source before R6 changes.
+PASS - Modified main Java sources compile under JDK 21 against the supplied NeoForge/Minecraft merged artifacts using narrow local stubs only for unavailable external runtime libraries (TFC/SLF4J/Netty/FML/Brigadier).
+PASS - FieldLedgerEntryTest and SoilHudFormatterTest sources compile under JDK 21 with a minimal JUnit API stub.
+PASS - Field Ledger schema constant is 4.
+PASS - Network registrar version is 7.
+PASS - Soil Cell schema/model remains unchanged at 3/3.
+PASS - mod_version and FoundationsSoil.VERSION both report 0.0.3a.R6.
+PASS - R6 packet encode/decode order was updated symmetrically for current TFC day and amendment-status fields.
+PASS - New ledger fields load with safe defaults when absent from R5 schema-3 entries.
+PASS - R6 updater payload contains only revision files plus docs/build metadata.
+
+NOT RUN - full Gradle clean/test/build. The container cannot resolve services.gradle.org / CurseMaven, so the native project build must run in the user's normal Windows project environment via build_mod.bat.

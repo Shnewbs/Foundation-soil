@@ -1,0 +1,16 @@
+{
+  "type": "tfc:barrel_sealed",
+  "duration": 12000,
+  "input_item": {
+    "item": "tfc:compost",
+    "count": 1
+  },
+  "input_fluid": {
+    "amount": 1000,
+    "fluid": "minecraft:water"
+  },
+  "output_fluid": {
+    "amount": 1000,
+    "id": "foundations_soil:compost_tea"
+  }
+}

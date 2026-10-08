@@ -1,0 +1,44 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+description='''
+Foundations Soil extends TerraFirmaCraft with persistent 4x4 living-soil cells, Field Ledger/Field Guide tools,
+and a server-authoritative data-driven agronomy system. 0.0.3a.R2 completes the physical liquid-amendment loop:
+registered amendment fluids, TFC barrel mixing recipes, standard/NeoForge fluid-container support, direct soil
+application, delayed TFC-calendar release, diminishing response, overapplication handling, and persistent amendment
+residues. TFC buckets/barrels or other mods may hold and transport the fluids; Foundations Soil intentionally does not
+implement pipes, sprinklers, pumps, or irrigation networks. Existing 0.0.2a/0.0.3a worlds retain their soil data.
+'''
+
+[[dependencies.${mod_id}]]
+modId="minecraft"
+type="required"
+versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="neoforge"
+type="required"
+versionRange="[${neo_version},)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="tfc"
+type="required"
+versionRange="${tfc_version_range}"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="foundations_framework"
+type="required"
+versionRange="${framework_version_range}"
+ordering="AFTER"
+side="BOTH"

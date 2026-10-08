@@ -1,0 +1,15 @@
+{
+  "type": "tfc:barrel_instant",
+  "input_item": {
+    "item": "foundations_soil:biochar",
+    "count": 1
+  },
+  "input_fluid": {
+    "amount": 1000,
+    "fluid": "minecraft:water"
+  },
+  "output_fluid": {
+    "amount": 1000,
+    "id": "foundations_soil:biochar_suspension"
+  }
+}

@@ -1,0 +1,18 @@
+Foundations Soil 0.0.3a.R3 - static validation notes
+2026-09-22
+
+Validated changes
+- Version advanced from 0.0.3a.R2 to 0.0.3a.R3.
+- Field Ledger persistent schema advanced from 1 to 2; older entries default to no TFC snapshot and remain loadable.
+- Field Guide payload protocol advanced from registrar 4 to 5 because CellView gained TFC snapshot fields.
+- Soil Probe scans capture the exact sampled block registry id.
+- TFC farmland scans capture read-only hydration + N/P/K snapshots; Foundations Soil never writes those TFC values.
+- Field Guide cell detail separates TERRAFIRMACRAFT from FOUNDATIONS SOIL.
+- Named-field detail aggregates only cells that actually contain TFC farmland snapshots.
+- Search can match the stored TFC soil block id.
+- Search EditBox text shadow is disabled.
+- Remaining centered book text now uses a no-shadow helper instead of GuiGraphics.drawCenteredString's shadowed default.
+- Existing 0.0.3a.R2 Soil Cell schema/model remain unchanged.
+
+Build-environment note
+A full Gradle build cannot be completed in this Linux container because the extracted Windows project does not include a Unix Gradle launcher or its external Gradle dependency cache, and outbound dependency download is unavailable. Source-level/static checks were performed; run build_mod.bat in the normal Windows project environment to execute clean test build.

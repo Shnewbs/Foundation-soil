@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "B B",
+    " B "
+  ],
+  "key": {
+    "B": {
+      "item": "tfc:burlap_cloth"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "foundations_soil:empty_amendment_bag"
+  }
+}

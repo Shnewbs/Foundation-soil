@@ -1,0 +1,36 @@
+// Example only — adapt package/mod IDs to your integration.
+ResourceLocation integrationId = ResourceLocation.fromNamespaceAndPath("examplemod", "soil");
+FoundationsSoilApi.registerIntegration(
+    integrationId.toString(),
+    "Example Soil Integration",
+    "soil_query", "crop_lifecycle", "solid_amendments", "liquid_amendments"
+);
+
+// Soil does not transport the material. Call this only after your machine/item/fluid logic
+// has authoritatively determined that the amendment reached this Soil Cell.
+AmendmentApplicationReceipt liquid = FoundationsSoilApi.applyLiquidAmendment(
+    level,
+    soilPos,
+    "compost_tea",
+    250.0, // mB
+    1.0,   // concentration
+    integrationId.toString()
+);
+
+AmendmentApplicationReceipt solid = FoundationsSoilApi.applySolidAmendment(
+    level,
+    soilPos,
+    "compost",
+    1.0, // one application unit
+    integrationId.toString()
+);
+
+// Detailed immutable event observation.
+var subscription = FoundationsSoilApi.events().listen(
+    SoilEvents.AmendmentDoseApplied.class,
+    event -> LOGGER.info(
+        "{} delivered {} {} at {}x; normalized={} effective={} overApplied={}",
+        event.amendmentId(), event.amount(), event.unit(), event.concentration(),
+        event.normalizedDose(), event.effectiveness(), event.overApplied()
+    )
+);

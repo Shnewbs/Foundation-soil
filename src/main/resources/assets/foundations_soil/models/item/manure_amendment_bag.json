@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "foundations_soil:item/manure_amendment_bag"
+  }
+}

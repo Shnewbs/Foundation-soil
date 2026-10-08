@@ -1,0 +1,15 @@
+{
+  "type": "tfc:barrel_instant",
+  "input_item": {
+    "item": "tfc:powder/lime",
+    "count": 1
+  },
+  "input_fluid": {
+    "amount": 1000,
+    "fluid": "minecraft:water"
+  },
+  "output_fluid": {
+    "amount": 1000,
+    "id": "foundations_soil:lime_suspension"
+  }
+}

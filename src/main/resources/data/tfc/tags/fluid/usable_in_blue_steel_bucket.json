@@ -1,0 +1,15 @@
+{
+  "replace": false,
+  "values": [
+    "foundations_soil:compost_tea",
+    "foundations_soil:manure_slurry",
+    "foundations_soil:lime_suspension",
+    "foundations_soil:sulfur_suspension",
+    "foundations_soil:biochar_suspension",
+    "foundations_soil:flowing_compost_tea",
+    "foundations_soil:flowing_manure_slurry",
+    "foundations_soil:flowing_lime_suspension",
+    "foundations_soil:flowing_sulfur_suspension",
+    "foundations_soil:flowing_biochar_suspension"
+  ]
+}

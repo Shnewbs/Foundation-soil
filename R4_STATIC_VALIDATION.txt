@@ -1,0 +1,18 @@
+Foundations Soil 0.0.3a.R4 static validation
+=============================================
+
+Prepared from the 0.0.3a.R3 updater source patch.
+
+Validated revision intent:
+- gradle.properties target version is 0.0.3a.R4.
+- FieldGuideScreen no longer assigns the EditBox-owned `Search ledger...` hint.
+- FieldGuideScreen renders `Search ledger...` with GuiGraphics.drawString(..., false).
+- The left-page `FS` folio is suppressed while Fields/Cells search is visible.
+- Cell detail rendering always emits a TERRAFIRMACRAFT section.
+- Missing TFC snapshots explicitly show `Snapshot: Not sampled` and a re-probe instruction.
+- Named Field detail rendering always emits a TERRAFIRMACRAFT SNAPSHOT section.
+- No FieldGuideDataPayload change is included; network registrar remains compatible with R3.
+- No FieldLedgerEntry/FieldLedgerData change is included; ledger schema remains 2.
+- No Soil Cell persistence change is included; Soil Cell schema/model remains 3/3.
+
+A full NeoForge/TFC compile should be run through build_mod.bat in the user's Windows project environment.

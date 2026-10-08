@@ -1,0 +1,37 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "tfc:compost"
+    },
+    {
+      "item": "tfc:compost"
+    },
+    {
+      "item": "tfc:compost"
+    },
+    {
+      "item": "tfc:compost"
+    },
+    {
+      "item": "tfc:compost"
+    },
+    {
+      "item": "tfc:compost"
+    },
+    {
+      "item": "tfc:compost"
+    },
+    {
+      "item": "tfc:compost"
+    },
+    {
+      "item": "foundations_soil:empty_amendment_bag"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "foundations_soil:compost_amendment_bag"
+  }
+}

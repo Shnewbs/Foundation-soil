@@ -1,0 +1,14 @@
+{
+  "ingredient": [
+    {
+      "item": "tfc:straw"
+    },
+    {
+      "item": "minecraft:hay_block"
+    },
+    {
+      "tag": "minecraft:leaves"
+    }
+  ],
+  "heat_capacity": 1.0
+}

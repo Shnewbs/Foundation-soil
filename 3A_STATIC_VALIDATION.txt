@@ -1,0 +1,50 @@
+Foundations Soil 0.0.3a — Static / Core Validation
+
+Checks: 42/42 PASS
+
+PASS — version_gradle_0_0_3a
+PASS — version_java_0_0_3a
+PASS — version_build_bootstrap
+PASS — schema_3
+PASS — model_3
+PASS — api_contract_v2
+PASS — builtin_compost_tea
+PASS — builtin_manure_slurry
+PASS — builtin_liquid_lime
+PASS — builtin_sulfur_solution
+PASS — builtin_biochar_suspension
+PASS — json_field_dose_unit
+PASS — json_field_reference_amount
+PASS — json_field_max_single_amount
+PASS — json_field_max_concentration
+PASS — json_field_immediate_fraction
+PASS — json_field_release_days
+PASS — json_field_overapplication_threshold
+PASS — json_field_overapplication_salinity
+PASS — input_bridge_solid_amendment
+PASS — input_bridge_liquid_amendment
+PASS — input_bridge_fertigation
+PASS — config_amendment_engine_enabled
+PASS — config_max_pending_amendment_releases
+PASS — config_max_normalized_amendment_dose
+PASS — field_guide_amendment_paging
+PASS — field_guide_3a_folio
+PASS — selftest_amendment_engine
+PASS — migration_no_2a_baseline
+PASS — pending_persistence
+PASS — solid_concentration_guard
+PASS — transport_not_owned
+PASS — resource_json_parse — 27 file(s)
+PASS — doc_0_0_3a_amendment_engine_md
+PASS — doc_0_0_3a_testing_md
+PASS — doc_migration_2a_to_3a_md
+PASS — doc_configuration_md
+PASS — doc_readme_md
+PASS — java_syntax_scan — javac parse scan; external MC/TFC symbols intentionally absent
+PASS — pure_amendment_core — AMENDMENT_CORE_PASS
+PASS — pending_release_core — PENDING_RELEASE_PASS
+PASS — soil_cell_3a_core — SOIL_CELL_3A_CORE_PASS
+
+Native NeoForge/TFC validation still required on the user build environment:
+  build_mod.bat
+Expected: clean test build -> build/libs/foundations_soil-0.0.3a.jar

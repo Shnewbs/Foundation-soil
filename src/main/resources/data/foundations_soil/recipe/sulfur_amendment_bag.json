@@ -1,0 +1,37 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "tfc:powder/sulfur"
+    },
+    {
+      "item": "tfc:powder/sulfur"
+    },
+    {
+      "item": "tfc:powder/sulfur"
+    },
+    {
+      "item": "tfc:powder/sulfur"
+    },
+    {
+      "item": "tfc:powder/sulfur"
+    },
+    {
+      "item": "tfc:powder/sulfur"
+    },
+    {
+      "item": "tfc:powder/sulfur"
+    },
+    {
+      "item": "tfc:powder/sulfur"
+    },
+    {
+      "item": "foundations_soil:empty_amendment_bag"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "foundations_soil:sulfur_amendment_bag"
+  }
+}
