@@ -1,5 +1,13 @@
 # Foundations Soil — Changelog
 
+## Unreleased — repository preparation for 0.1
+
+- Organized historical revision and validation records under `docs/history/`.
+- Updated current README, Field Ledger schema notes, and mod description.
+- Added a POSIX wrapper launcher and Java 21 GitHub build/test workflow.
+- Kept the wrapper JAR tracked and documented the 0.1 work packages and gates.
+- No gameplay, save-format, network, or mod-version change.
+
 ## 0.0.3a.R6 — Field Guide Soil Management Hardening
 **Date:** 2026-09-22
 
@@ -179,7 +187,7 @@
 - Added reserved external input contracts for WATER, LIQUID_AMENDMENT, FERTIGATION, AERATION and MACHINERY_DISTURBANCE ahead of 0.0.3a.
 - Added best-effort Foundations Framework module/service bridge for Soil Service, Script Gateway and Soil Events.
 - Added `/fsoil api`, `/fsoil integrations`, and `/fsoil hooks`.
-- Added `R7_INTEGRATION_API.md`, R7 testing checklist, and updated KubeJS Java-interop example.
+- Added `docs/history/R7_INTEGRATION_API.md`, R7 testing checklist, and updated KubeJS Java-interop example.
 
 ### Compatibility
 - Soil Cell save schema/model remains `2/2`.

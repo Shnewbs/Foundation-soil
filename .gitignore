@@ -3,5 +3,7 @@ build/
 run/
 .idea/
 *.iml
-gradle/wrapper/gradle-wrapper.jar
 libs/*.jar
+
+*.log
+.DS_Store

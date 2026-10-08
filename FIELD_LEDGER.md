@@ -1,4 +1,4 @@
-# Foundations Field Ledger — 0.0.2a.R2
+# Foundations Field Ledger — 0.0.3a.R6
 
 The Field Ledger is a **player-facing index and history layer** over Foundations Soil. It does **not** replace or duplicate the authoritative Soil Cell database.
 
@@ -42,8 +42,8 @@ Records are partitioned by player UUID. Multiple players may discover the same S
 Ledger schema:
 
 ```text
-Field Ledger schema = 1
-Soil Cell schema/model remain = 2/2
+Field Ledger schema = 4
+Soil Cell schema/model remain = 3/3
 ```
 
 The ledger contains compact snapshots only. Soil chemistry/history remains authoritative in `foundations_soil_cells.dat` for the dimension containing the Soil Cell.
@@ -82,7 +82,7 @@ Snapshots do not tick independently. That avoids a second simulation/database. T
 
 Each discovered cell stores at most **12 player-facing recent events**. This is intentionally bounded and is not a second infinite audit log.
 
-R2 records events such as:
+Recorded events include:
 
 ```text
 Soil Cell discovered with Soil Probe
@@ -114,7 +114,7 @@ Named fields support:
 
 Deleting a named Field does **not** delete discovered cells. Its member cells simply become unassigned.
 
-## R2 commands
+## Commands
 
 ```text
 /fsoil ledger status
@@ -136,15 +136,10 @@ Deleting a named Field does **not** delete discovered cells. Its member cells si
 
 All normal player ledger commands operate only on that player's UUID-backed ledger.
 
-## R3 direction
+## Field Guide in R6
 
-`0.0.2a.R3` can place a GUI/search layer over this backend without changing the Soil Cell save format. Planned views include:
+The read-only Field Guide provides search, paging, favorites filtering, named-field summaries, TFC hydration and N/P/K snapshots, amendment status, scan age, warnings, and bounded history. Ledger editing still uses commands.
 
-- named field dashboard;
-- search/filter;
-- favorites;
-- cell map/list by dimension/chunk/coordinates;
-- current snapshot cards;
-- problem/warning cells;
-- crop/rotation summaries;
-- amendment/recent-history views.
+R5 adds TFC min/max hydration snapshots. R6 adds last-dose details, delayed-release status, observed overapplication outcomes, and field priority summaries. Re-probe old entries to refresh missing snapshot data. Historical overapplication outcomes cannot be reconstructed retroactively.
+
+Detail scrolling and in-GUI management remain planned; see [the 0.1 plan](ROADMAP_0.1.md).
