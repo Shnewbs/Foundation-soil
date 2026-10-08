@@ -1,0 +1,56 @@
+name: Publish GitHub Release
+on:
+  push:
+    tags: ['mc-*-v*']
+permissions:
+  contents: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate platform and version
+        id: metadata
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python3 tools/release_metadata.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ steps.metadata.outputs.java }}
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build and test tagged source
+        run: ./gradlew --no-daemon clean test build
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-test-reports-${{ github.ref_name }}
+          path: |
+            build/reports/tests/
+            build/test-results/
+          if-no-files-found: ignore
+      - name: Publish built JARs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TITLE: ${{ steps.metadata.outputs.title }}
+          PRERELEASE: ${{ steps.metadata.outputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          jars=(build/libs/*.jar)
+          ((${#jars[@]} > 0)) || { echo 'No built JARs found'; exit 1; }
+          if gh release view "$RELEASE_TAG" --json isDraft > release-state.json; then
+            python3 -c 'import json; assert json.load(open("release-state.json"))["isDraft"], "Release is already published; use a new version"'
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "$RELEASE_TITLE" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" "${jars[@]}" --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease="$PRERELEASE"

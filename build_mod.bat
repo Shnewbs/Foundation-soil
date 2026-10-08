@@ -28,4 +28,4 @@ call gradlew.bat --no-daemon clean test build
 if errorlevel 1 exit /b %errorlevel%
 
 echo.
-echo Build complete. Check build\libs\foundations_soil-0.0.3a.R6.jar
+echo Build complete. Check build\libs\foundations_soil-1.21.1-0.0.3a.R6.jar

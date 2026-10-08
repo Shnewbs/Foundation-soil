@@ -39,7 +39,7 @@ On Windows:
 build_mod.bat
 ```
 
-Output: `build/libs/foundations_soil-0.0.3a.R6.jar`.
+Output: `build/libs/foundations_soil-1.21.1-0.0.3a.R6.jar`.
 The Gradle wrapper is checked in. First build requires access to Gradle, NeoForge, Maven, and CurseMaven dependencies.
 Framework is required in the game; compilation uses a reflection bridge. An optional local Framework JAR can be placed in `libs/` as described in [libs/README.txt](libs/README.txt).
 
@@ -60,3 +60,7 @@ The next implementation work is Field Guide scrolling and server-validated GUI f
 - [Field Ledger](FIELD_LEDGER.md)
 - [Cannabis/Soil integration boundary](FOUNDATIONS_CANNABIS_SOIL_CONTRACT.md)
 - [Historical revision records](docs/history/README.md)
+
+## Platform and release policy
+
+Maintain 1.21.1 and 26.3 in parallel; move the newer line to 26.4 when released while retaining 1.21.1. Every platform release must publish its tested JAR as a GitHub Release. The 26.3 port is pending. See [RELEASING.md](RELEASING.md).

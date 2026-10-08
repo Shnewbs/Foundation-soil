@@ -36,3 +36,7 @@ Only `main` exists. The imported source has 13 unit-test classes, but those test
 Local `clean test build` failed at the Gradle distribution download (`UnknownHostException: services.gradle.org`), before compilation. Java 21 is also absent locally. GitHub Actions is added to provide a build check in a Java 21 environment; its result must be inspected rather than assumed.
 
 Preserve Soil Cell schema/model 3/3, Field Ledger schema 4, network 7, and source version 0.0.3a.R6 during repository-only cleanup. Advance them only with the corresponding tested implementation. No 0.1 release is published by this cleanup.
+
+## Platform and release policy
+
+Maintain 1.21.1 and 26.3 in parallel; move the newer line to 26.4 when released while retaining 1.21.1. Every platform release must publish its tested JAR as a GitHub Release. The 26.3 port is pending. See [RELEASING.md](RELEASING.md).
