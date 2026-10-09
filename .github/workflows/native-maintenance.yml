@@ -39,7 +39,7 @@ jobs:
           import json, pathlib, struct, tomllib, xml.etree.ElementTree as ET, zipfile
           roots = [ET.parse(p).getroot() for p in pathlib.Path('build/test-results/test').glob('TEST-*.xml')]
           counts = {k: sum(int(r.get(k, 0)) for r in roots) for k in ('tests', 'failures', 'errors', 'skipped')}
-          assert counts == {'tests':93, 'failures':0, 'errors':0, 'skipped':0}, counts
+          assert counts == {'tests':95, 'failures':0, 'errors':0, 'skipped':0}, counts
           with zipfile.ZipFile('build/libs/foundations_soil-26.1.2-0.1.0-beta-port.2.jar') as z:
               meta = tomllib.loads(z.read('META-INF/neoforge.mods.toml').decode())
               assert meta['mods'][0]['version'] == '0.1.0-beta-port.2'
@@ -55,8 +55,8 @@ jobs:
               assert all(n.removesuffix('.class').split('$')[0] not in test_types for n in classes)
           pathlib.Path('build/reports/native-test-summary.json').write_text(json.dumps({
               'version':'0.1.0-beta-port.2', 'minecraft':'26.1.2', 'java':25,
-              'counts':counts, 'native_class_count':len(classes), 'new_regression_tests':19,
-              'tfc_runtime_tests_deferred':3,
+              'counts':counts, 'native_class_count':len(classes), 'new_regression_tests':21,
+              'nested_two_dose_sequences':512, 'tfc_runtime_tests_deferred':3,
               'game_launch':'not run; native TFC/Framework integration remains unverified'}, indent=2)+'\n')
           PY
       - name: Verify missing native runtime dependencies still fail explicitly
@@ -76,15 +76,15 @@ jobs:
           test "$(git ls-remote origin refs/heads/mc-26.1.2 | cut -f1)" = "$GITHUB_SHA"
           git config user.name 'Foundations Soil build bot'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          rm tools/native-maintenance/0?.patch tools/native-maintenance/READY.json
+          rm tools/native-maintenance/0?.patch tools/native-maintenance/READY.json tools/native-maintenance/HOLD.md
           git add -A -- src docs/ports/26.1.2 tools/native-maintenance CHANGELOG.md README.md RELEASING.md build_mod.bat gradle.properties
           git diff --cached --check
-          git commit -m 'Native port.2: transactional liquid dosing and strict saved-data validation; 93 model tests pass'
+          git commit -m 'Native port.2: shared-cell transactional liquid dosing and strict saved-data validation; 95 model tests pass'
           git push origin HEAD:refs/heads/mc-26.1.2
           sha="$(git rev-parse HEAD)"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$(cat /tmp/soil-main-before)"
-          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$sha" -f state=success -f context='native-26.1.2/build-model-tests' -f description='Native compile and 93 model tests pass; full runtime remains unverified' -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$sha" -f state=success -f context='native-26.1.2/build-model-tests' -f description='Native compile and 95 model tests pass; full runtime remains unverified' -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
       - name: Assemble source, binary and evidence assets
         run: |
           mkdir -p build/release
