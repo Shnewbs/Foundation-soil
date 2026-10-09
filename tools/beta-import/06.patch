@@ -1,0 +1,271 @@
+diff --git a/src/main/java/com/foundations/soil/ledger/SoilLaboratoryReports.java b/src/main/java/com/foundations/soil/ledger/SoilLaboratoryReports.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..20eefcf887e8b332cdfa130723a5e931d4b8c840
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/ledger/SoilLaboratoryReports.java
+@@ -0,0 +1,131 @@
++package com.foundations.soil.ledger;
++
++import com.foundations.soil.soil.SoilPhysics;
++import com.foundations.soil.soil.SoilTrend;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++import java.util.TreeMap;
++import java.util.function.ToDoubleFunction;
++
++/** Snapshot-only analysis: no chunk loading, world mutation, or another player's ledger. */
++public final class SoilLaboratoryReports {
++    private SoilLaboratoryReports() {}
++    public static List<String> describe(PlayerFieldLedger ledger, LaboratorySelection selected) {
++        if (selected.field()) {
++            var field = ledger.field(selected.fieldId()).orElse(null);
++            if (field == null) return List.of("Choose one of your fields.");
++            List<FieldLedgerEntry> members = ledger.sortedEntries().stream().filter(e -> e.fieldId() == field.id()).toList();
++            ArrayList<String> out = new ArrayList<>();
++            out.add(field.name()); out.add("Field #" + field.id() + ": " + members.size() + " discovered cells");
++            if (members.isEmpty()) { out.add("Assign discovered cells in the Field Guide."); return List.copyOf(out); }
++            long oldest = members.stream().mapToLong(FieldLedgerEntry::lastScannedDay).min().orElse(0);
++            long newest = members.stream().mapToLong(FieldLedgerEntry::lastScannedDay).max().orElse(0);
++            out.add("Soil snapshots: TFC days " + oldest + " to " + newest);
++            out.add("Averages below use every field member, not just the current guide page.");
++            out.add("Organic matter: " + percent(average(members, FieldLedgerEntry::organicMatter)));
++            out.add("pH: " + number(average(members, FieldLedgerEntry::pH)));
++            out.add("Compaction: " + percent(average(members, FieldLedgerEntry::compaction)));
++            out.add("Structure: " + percent(average(members, FieldLedgerEntry::structure)));
++            out.add("Biology: " + percent(average(members, FieldLedgerEntry::biology)));
++            out.add("Salinity: " + percent(average(members, FieldLedgerEntry::salinity)));
++            out.add("Continuous crop pressure: " + percent(average(members, FieldLedgerEntry::continuousPressure)));
++            out.add("Nutrient access: x" + number(average(members, FieldLedgerEntry::nutrientAccess)));
++            List<FieldLedgerEntry> nutrients = members.stream().filter(FieldLedgerEntry::tfcFarmlandDataPresent).toList();
++            out.add("TFC nutrient snapshots available: " + nutrients.size() + "/" + members.size());
++            if (!nutrients.isEmpty()) {
++                out.add("Stored N / P / K: " + percent(average(nutrients, FieldLedgerEntry::tfcNitrogen)) + " / "
++                    + percent(average(nutrients, FieldLedgerEntry::tfcPhosphorus)) + " / " + percent(average(nutrients, FieldLedgerEntry::tfcPotassium)));
++                out.add("Effective N / P / K: " + percent(average(nutrients, e -> effective(e.tfcNitrogen(), e.nutrientAccess()))) + " / "
++                    + percent(average(nutrients, e -> effective(e.tfcPhosphorus(), e.nutrientAccess()))) + " / "
++                    + percent(average(nutrients, e -> effective(e.tfcPotassium(), e.nutrientAccess()))));
++                out.add("Nutrients retain their last-probe timestamps; they are not live field measurements.");
++            }
++            long pending = members.stream().filter(e -> e.pendingAmendmentCount() > 0).count();
++            out.add("Cells with delayed amendment effects: " + pending);
++            out.add("Cells with overapplication recorded: " + members.stream().filter(FieldLedgerEntry::lastAmendmentOverApplied).count());
++            List<FieldLedgerEntry> physical = members.stream().filter(e -> e.texture().isPresent()).toList();
++            out.add("Physical composition available: " + physical.size() + "/" + members.size());
++            if (!physical.isEmpty()) out.add("Sand / silt / clay: " + percent(average(physical, e -> e.texture().orElseThrow().sand())) + " / "
++                + percent(average(physical, e -> e.texture().orElseThrow().silt())) + " / " + percent(average(physical, e -> e.texture().orElseThrow().clay())));
++            TreeMap<Long, double[]> days = new TreeMap<>();
++            for (FieldLedgerEntry entry : members) for (SoilTrend.Point point : entry.trendPoints()) {
++                double[] values = days.computeIfAbsent(point.day(), ignored -> new double[4]);
++                values[0]++; values[1] += point.profile().organicMatter(); values[2] += point.profile().pH(); values[3] += point.profile().biology();
++                if (days.size() > SoilTrend.CAPACITY) days.pollFirstEntry();
++            }
++            out.add("ALIGNED FIELD TRENDS (complete membership only)");
++            int complete = 0;
++            for (var day : days.entrySet()) {
++                double[] values = day.getValue();
++                if (values[0] != members.size()) continue;
++                complete++;
++                out.add("Day " + day.getKey() + ": OM " + percent(values[1] / values[0]) + ", pH " + number(values[2] / values[0]) + ", biology " + percent(values[3] / values[0]));
++            }
++            if (complete == 0) out.add("No aligned whole-field observations yet. Inspect individual cells; no missing days are invented.");
++            if (!field.note().isBlank()) { out.add("Note:"); out.add(field.note()); }
++            return List.copyOf(out);
++        }
++        FieldLedgerEntry e = ledger.entry(selected.cellKey()).orElse(null);
++        if (e == null) return List.of("Choose one of your discovered soil cells.", "Probe soil first, then compare its saved observations here.");
++        ArrayList<String> out = new ArrayList<>();
++        out.add("Cell " + e.cellX() + ", " + e.cellZ()); out.add(e.dimension());
++        out.add("Soil state: TFC day " + e.lastScannedDay());
++        out.add("TFC probe: " + (e.lastProbeDay() < 0 ? "legacy / unknown timestamp" : "day " + e.lastProbeDay()));
++        out.add("Soil and TFC values are timestamped snapshots, not remote live measurements.");
++        out.add("Organic matter: " + percent(e.organicMatter())); out.add("pH: " + number(e.pH()));
++        out.add("Drainage quality: " + percent(e.drainage())); out.add("Compaction: " + percent(e.compaction()));
++        out.add("Structure: " + percent(e.structure())); out.add("Biology: " + percent(e.biology())); out.add("Salinity: " + percent(e.salinity()));
++        out.add("Nutrient access: x" + number(e.nutrientAccess()));
++        if (e.tfcFarmlandDataPresent()) {
++            out.add("TFC STORED / EFFECTIVE NUTRIENTS");
++            out.add("Nitrogen: " + percent(e.tfcNitrogen()) + " / " + percent(effective(e.tfcNitrogen(), e.nutrientAccess())));
++            out.add("Phosphorus: " + percent(e.tfcPhosphorus()) + " / " + percent(effective(e.tfcPhosphorus(), e.nutrientAccess())));
++            out.add("Potassium: " + percent(e.tfcPotassium()) + " / " + percent(effective(e.tfcPotassium(), e.nutrientAccess())));
++        } else out.add("No stored TFC farmland nutrient measurement in this snapshot.");
++        if (e.texture().isPresent()) {
++            var texture = e.texture().orElseThrow();
++            out.add("PHYSICAL MODEL"); out.add("Texture: " + texture.textureClass().replace('_', ' '));
++            out.add("Sand / silt / clay: " + percent(texture.sand()) + " / " + percent(texture.silt()) + " / " + percent(texture.clay()));
++            if (e.tfcHydration() >= 0) {
++                var physics = SoilPhysics.evaluate(texture, e.profileSnapshot(), e.tfcHydration() / 100.0);
++                out.add("TFC hydration (last probe): " + e.tfcHydration() + "%");
++                out.add("Water holding: " + percent(physics.waterHolding())); out.add("Field capacity index: " + percent(physics.fieldCapacity()));
++                out.add("Aeration: " + percent(physics.aeration())); out.add("Root resistance: " + percent(physics.rootResistance()));
++                out.add("Effective drainage: " + percent(physics.effectiveDrainage()));
++                out.add("Root-zone estimate: " + physics.moisture().name().toLowerCase(Locale.ROOT));
++                out.add("This interprets the last measured hydration; it does not create a second water store.");
++            }
++        } else out.add("Re-probe this legacy cell to record its physical composition.");
++        out.add("MANAGEMENT");
++        out.add("Crop cycles: " + e.cropCycles() + "; active plantings: " + e.activePlantings());
++        out.add("Last harvested family: " + (e.lastHarvestFamily().isBlank() ? "none" : e.lastHarvestFamily()));
++        out.add("Continuous pressure: " + percent(e.continuousPressure()));
++        out.add("Days bare / covered: " + e.daysBare() + " / " + e.daysCovered());
++        out.add("Organic and residue reserve: " + percent(e.organicReserve()));
++        out.add("Amendment applications: " + e.amendmentApplications());
++        out.add("Last amendment: " + (e.lastAmendmentId().isBlank() ? "none" : e.lastAmendmentId()));
++        out.add("Delayed effects: " + e.pendingAmendmentCount() + "; up to " + number(e.pendingAmendmentDaysRemaining()) + " TFC days at snapshot");
++        if (e.lastAmendmentOverApplied()) out.add("WARNING: last amendment was overapplied.");
++        if (e.salinity() >= .15) out.add("Management: reduce saline inputs; improve drainage before adding more amendments.");
++        if (e.compaction() >= .45) out.add("Management: avoid wet-soil traffic and rebuild structure gradually.");
++        if (e.continuousPressure() >= .35) out.add("Management: rotate crop families or allow fallow recovery.");
++        out.add("OBSERVED TFC-DAY TRENDS (maximum 16)");
++        var points = e.trendPoints();
++        if (points.size() > 1) {
++            var a = points.getFirst().profile(); var b = points.getLast().profile();
++            out.add("Change since day " + points.getFirst().day() + ": OM " + signed(b.organicMatter() - a.organicMatter()) + " pp; pH " + String.format(Locale.ROOT, "%+.2f", b.pH() - a.pH()));
++        }
++        for (var point : points) out.add("Day " + point.day() + ": OM " + percent(point.profile().organicMatter())
++            + ", pH " + number(point.profile().pH()) + ", biology " + percent(point.profile().biology()));
++        if (points.isEmpty()) out.add("No observations yet. Probe this cell to begin monitoring.");
++        out.add("Gaps are unobserved intervals, not interpolated measurements.");
++        if (!e.note().isBlank()) { out.add("Note:"); out.add(e.note()); }
++        return List.copyOf(out);
++    }
++    private static double average(List<FieldLedgerEntry> entries, ToDoubleFunction<FieldLedgerEntry> value) { return entries.stream().mapToDouble(value).average().orElse(0); }
++    private static double effective(double stored, double access) { return Math.max(0, Math.min(1, stored * access)); }
++    private static String percent(double value) { return String.format(Locale.ROOT, "%.1f%%", value * 100); }
++    private static String number(double value) { return String.format(Locale.ROOT, "%.2f", value); }
++    private static String signed(double value) { return String.format(Locale.ROOT, "%+.1f", value * 100); }
++}
+diff --git a/src/main/java/com/foundations/soil/mixin/TfcCropYieldMixin.java b/src/main/java/com/foundations/soil/mixin/TfcCropYieldMixin.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..bdf763dea9c1f74e218c7c1157370b82b7d6e0fd
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/mixin/TfcCropYieldMixin.java
+@@ -0,0 +1,23 @@
++package com.foundations.soil.mixin;
++
++import com.foundations.soil.integration.TfcCropResponseBridge;
++import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
++import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
++import net.dries007.tfc.common.blockentities.CropBlockEntity;
++import net.dries007.tfc.common.blocks.crop.CropHelpers;
++import net.minecraft.core.BlockPos;
++import net.minecraft.util.RandomSource;
++import net.minecraft.world.level.Level;
++import net.minecraft.world.level.block.state.BlockState;
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++
++@Mixin(value = CropHelpers.class, remap = false)
++public abstract class TfcCropYieldMixin {
++    @WrapOperation(method = "growthTickStep", at = @At(value = "INVOKE", target = "Lnet/dries007/tfc/common/blockentities/CropBlockEntity;setYield(F)V"), require = 1)
++    private static void foundations_soil$yield(CropBlockEntity receiver, float proposed, Operation<Void> original,
++                                               Level level, BlockPos pos, BlockState state, RandomSource random,
++                                               long fromTick, long toTick, CropBlockEntity crop) {
++        original.call(receiver, TfcCropResponseBridge.yield(level, pos, state, receiver.getYield(), proposed));
++    }
++}
+diff --git a/src/main/java/com/foundations/soil/mixin/TfcPickingHarvestMixin.java b/src/main/java/com/foundations/soil/mixin/TfcPickingHarvestMixin.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..2cf746e38122c8a8ff70d3714b69315b8ea9b29b
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/mixin/TfcPickingHarvestMixin.java
+@@ -0,0 +1,27 @@
++package com.foundations.soil.mixin;
++
++import com.foundations.soil.crop.CropRegistry;
++import com.foundations.soil.soil.SoilManager;
++import com.foundations.soil.soil.SoilTargeting;
++import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
++import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
++import net.dries007.tfc.common.blockentities.CropBlockEntity;
++import net.dries007.tfc.common.blocks.crop.PickableCropBlock;
++import net.dries007.tfc.common.blocks.crop.PickableClimbingCropBlock;
++import net.minecraft.server.level.ServerLevel;
++import org.spongepowered.asm.mixin.Mixin;
++import org.spongepowered.asm.mixin.injection.At;
++
++/** Runs only on TFC's confirmed fruit-picking path, never a speculative interaction event. */
++@Mixin(value = {PickableCropBlock.class, PickableClimbingCropBlock.class}, remap = false)
++public abstract class TfcPickingHarvestMixin {
++    @WrapOperation(method = "useItemOn", at = @At(value = "INVOKE", target = "Lnet/dries007/tfc/common/blockentities/CropBlockEntity;setYield(F)V"), require = 2)
++    private void foundations_soil$picked(CropBlockEntity crop, float value, Operation<Void> original) {
++        original.call(crop, value);
++        if (value == 0f && crop.getLevel() instanceof ServerLevel level) {
++            var soil = crop.getBlockPos().below();
++            if (SoilTargeting.isSoil(level.getBlockState(soil)))
++                SoilManager.recordPickingHarvest(level, soil, CropRegistry.resolve(crop.getBlockState()).family());
++        }
++    }
++}
+diff --git a/src/main/java/com/foundations/soil/network/FieldGuideDataPayload.java b/src/main/java/com/foundations/soil/network/FieldGuideDataPayload.java
+index 984db28b9b3f2c6070ac6bb4ffbc3bcc2fb9fa22..99ccbf096001d5d714d4e00bbe03718f16ce5564 100644
+--- a/src/main/java/com/foundations/soil/network/FieldGuideDataPayload.java
++++ b/src/main/java/com/foundations/soil/network/FieldGuideDataPayload.java
+@@ -30 +30 @@ public record FieldGuideDataPayload(
+-    boolean truncated
++    boolean truncated, int fieldOffset, int cellOffset, int totalFields
+@@ -32,3 +32,3 @@ public record FieldGuideDataPayload(
+-    private static final int HARD_MAX_SYNC_CELLS = 2048;
+-    private static final int HARD_MAX_SYNC_FIELDS = 512;
+-    private static final int HARD_MAX_EVENTS_PER_CELL = 16;
++    public static final int HARD_MAX_SYNC_CELLS = 64;
++    public static final int HARD_MAX_SYNC_FIELDS = 128;
++    private static final int HARD_MAX_EVENTS_PER_CELL = 8;
+@@ -44 +44 @@ public record FieldGuideDataPayload(
+-            int fieldCount = Math.min(HARD_MAX_SYNC_FIELDS, buffer.readVarInt());
++            int fieldCount = NetworkBounds.count(buffer.readVarInt(), HARD_MAX_SYNC_FIELDS);
+@@ -48 +48 @@ public record FieldGuideDataPayload(
+-            int cellCount = Math.min(HARD_MAX_SYNC_CELLS, buffer.readVarInt());
++            int cellCount = NetworkBounds.count(buffer.readVarInt(), HARD_MAX_SYNC_CELLS);
+@@ -52 +52 @@ public record FieldGuideDataPayload(
+-            int amendmentCount = Math.min(HARD_MAX_AMENDMENTS, buffer.readVarInt());
++            int amendmentCount = NetworkBounds.count(buffer.readVarInt(), HARD_MAX_AMENDMENTS);
+@@ -63 +63 @@ public record FieldGuideDataPayload(
+-                warnings, preset, applicationsPerBag, currentTfcDay, totalCells, truncated);
++                warnings, preset, applicationsPerBag, currentTfcDay, totalCells, truncated, buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt());
+@@ -79,0 +80 @@ public record FieldGuideDataPayload(
++            buffer.writeVarInt(payload.fieldOffset()); buffer.writeVarInt(payload.cellOffset()); buffer.writeVarInt(payload.totalFields());
+@@ -83 +84,14 @@ public record FieldGuideDataPayload(
+-    public static FieldGuideDataPayload from(ServerPlayer player) {
++    public FieldGuideDataPayload {
++        fields = List.copyOf(fields); cells = List.copyOf(cells); amendments = List.copyOf(amendments);
++        NetworkBounds.count(fields.size(), HARD_MAX_SYNC_FIELDS); NetworkBounds.count(cells.size(), HARD_MAX_SYNC_CELLS);
++        NetworkBounds.count(amendments.size(), HARD_MAX_AMENDMENTS);
++        if (fieldOffset < 0 || cellOffset < 0 || totalFields < 0 || totalCells < 0) throw new IllegalArgumentException("Invalid ledger page metadata");
++    }
++
++    public FieldGuideDataPayload(List<FieldView> fields, List<CellView> cells, List<AmendmentView> amendments,
++            WarningView warnings, String preset, int applicationsPerBag, long currentTfcDay, int totalCells, boolean truncated) {
++        this(fields, cells, amendments, warnings, preset, applicationsPerBag, currentTfcDay, totalCells, truncated, 0, 0, fields.size());
++    }
++
++    public static FieldGuideDataPayload from(ServerPlayer player) { return from(player, 0, 0); }
++    public static FieldGuideDataPayload from(ServerPlayer player, int requestedFields, int requestedCells) {
+@@ -88,0 +103,5 @@ public record FieldGuideDataPayload(
++        List<FieldLedgerEntry> rawCells = FieldLedgerManager.entries(player);
++        int fieldOffset = NetworkBounds.pageOffset(requestedFields, rawFields.size(), maxFields);
++        int cellOffset = NetworkBounds.pageOffset(requestedCells, rawCells.size(), maxCells);
++        java.util.Map<Integer, Integer> memberCounts = new java.util.HashMap<>();
++        for (FieldLedgerEntry entry : rawCells) memberCounts.merge(entry.fieldId(), 1, Integer::sum);
+@@ -90 +109 @@ public record FieldGuideDataPayload(
+-        for (int i = 0; i < Math.min(maxFields, rawFields.size()); i++) {
++        for (int i = fieldOffset; i < Math.min(fieldOffset + maxFields, rawFields.size()); i++) {
+@@ -92 +111 @@ public record FieldGuideDataPayload(
+-            fields.add(new FieldView(field.id(), field.name(), field.note(), field.favorite(), FieldLedgerManager.fieldMembers(player, field.id())));
++            fields.add(new FieldView(field.id(), field.name(), field.note(), field.favorite(), memberCounts.getOrDefault(field.id(), 0)));
+@@ -95 +113,0 @@ public record FieldGuideDataPayload(
+-        List<FieldLedgerEntry> rawCells = FieldLedgerManager.entries(player);
+@@ -97 +115 @@ public record FieldGuideDataPayload(
+-        for (int i = 0; i < Math.min(maxCells, rawCells.size()); i++) cells.add(CellView.from(rawCells.get(i), maxEvents));
++        for (int i = cellOffset; i < Math.min(cellOffset + maxCells, rawCells.size()); i++) cells.add(CellView.from(rawCells.get(i), maxEvents));
+@@ -107 +125,2 @@ public record FieldGuideDataPayload(
+-            Math.max(0L, Calendars.SERVER.getTotalCalendarDays()), rawCells.size(), rawCells.size() > cells.size());
++            Math.max(0L, Calendars.SERVER.getTotalCalendarDays()), rawCells.size(),
++            rawCells.size() > cells.size() || rawFields.size() > fields.size(), fieldOffset, cellOffset, rawFields.size());
+@@ -250 +269 @@ public record FieldGuideDataPayload(
+-            int eventCount = Math.min(HARD_MAX_EVENTS_PER_CELL, buffer.readVarInt());
++            int eventCount = NetworkBounds.count(buffer.readVarInt(), HARD_MAX_EVENTS_PER_CELL);
+@@ -304,0 +324 @@ public record FieldGuideDataPayload(
++            NetworkBounds.count(recentEvents.size(), HARD_MAX_EVENTS_PER_CELL);
+@@ -308,0 +329 @@ public record FieldGuideDataPayload(
++        public String key() { return com.foundations.soil.ledger.FieldLedgerEntry.key(dimension, cellX, cellZ); }
