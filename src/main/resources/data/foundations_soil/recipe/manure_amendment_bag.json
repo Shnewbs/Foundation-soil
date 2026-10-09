@@ -2,33 +2,15 @@
   "type": "minecraft:crafting_shapeless",
   "category": "misc",
   "ingredients": [
-    {
-      "item": "foundations_soil:manure"
-    },
-    {
-      "item": "foundations_soil:manure"
-    },
-    {
-      "item": "foundations_soil:manure"
-    },
-    {
-      "item": "foundations_soil:manure"
-    },
-    {
-      "item": "foundations_soil:manure"
-    },
-    {
-      "item": "foundations_soil:manure"
-    },
-    {
-      "item": "foundations_soil:manure"
-    },
-    {
-      "item": "foundations_soil:manure"
-    },
-    {
-      "item": "foundations_soil:empty_amendment_bag"
-    }
+    "foundations_soil:manure",
+    "foundations_soil:manure",
+    "foundations_soil:manure",
+    "foundations_soil:manure",
+    "foundations_soil:manure",
+    "foundations_soil:manure",
+    "foundations_soil:manure",
+    "foundations_soil:manure",
+    "foundations_soil:empty_amendment_bag"
   ],
   "result": {
     "count": 1,

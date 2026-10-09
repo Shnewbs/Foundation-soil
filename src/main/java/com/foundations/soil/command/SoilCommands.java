@@ -59,13 +59,13 @@ public final class SoilCommands {
             .then(Commands.literal("definitions")
                 .executes(context -> definitions(context.getSource().getPlayerOrException()))
                 .then(Commands.literal("reload")
-                    .requires(source -> source.hasPermission(2))
+                    .requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
                     .executes(context -> definitionsReload(context.getSource().getPlayerOrException()))))
             .then(Commands.literal("amendment")
                 .then(Commands.literal("list")
                     .executes(context -> amendmentList(context.getSource().getPlayerOrException())))
                 .then(Commands.literal("apply")
-                    .requires(source -> source.hasPermission(2))
+                    .requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
                     .then(Commands.argument("id", StringArgumentType.word())
                         .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0.000001))
                             .executes(context -> amendmentApply(context.getSource().getPlayerOrException(),
@@ -83,7 +83,7 @@ public final class SoilCommands {
                     .executes(context -> preview(context.getSource().getPlayerOrException(),
                         IntegerArgumentType.getInteger(context, "days")))))
             .then(Commands.literal("reset")
-                .requires(source -> source.hasPermission(2))
+                .requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
                 .executes(context -> reset(context.getSource().getPlayerOrException())));
 
         var ledger = Commands.literal("ledger")
@@ -137,7 +137,7 @@ public final class SoilCommands {
         ledger.then(field);
         root.then(ledger);
 
-        var set = Commands.literal("set").requires(source -> source.hasPermission(2));
+        var set = Commands.literal("set").requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER));
         for (String stat : new String[]{"organic_matter", "ph", "drainage", "compaction", "structure", "biology", "salinity"}) {
             final String key = stat;
             set.then(Commands.literal(stat)
@@ -150,7 +150,7 @@ public final class SoilCommands {
     }
 
     private static int status(ServerPlayer player) {
-        int cells = SoilManager.loadedCellCount(player.serverLevel());
+        int cells = SoilManager.loadedCellCount(player.level());
         var metrics = SoilRuntimeMetrics.snapshot();
         player.sendSystemMessage(Component.literal("Foundations Soil " + FoundationsSoil.VERSION + " — Amendment Engine")
             .withStyle(ChatFormatting.GOLD));
@@ -338,7 +338,7 @@ public final class SoilCommands {
             return 0;
         }
         try {
-            var receipt = FoundationsSoilApi.service().applyRegisteredAmendmentDose(player.serverLevel(), pos, id, amount,
+            var receipt = FoundationsSoilApi.service().applyRegisteredAmendmentDose(player.level(), pos, id, amount,
                 def.doseUnit(), concentration, "command:" + player.getUUID());
             player.sendSystemMessage(Component.literal("Applied " + def.displayName() + " | normalized=" + fmt(receipt.normalizedDose())
                 + " | effectiveness=" + Math.round(receipt.effectiveness() * 1000) / 10.0 + "%"
@@ -405,8 +405,8 @@ public final class SoilCommands {
     private static int preview(ServerPlayer player, int days) {
         BlockPos pos = targetPos(player);
         if (pos == null) return 0;
-        SoilCell before = SoilManager.getOrCreate(player.serverLevel(), pos);
-        SoilCell after = SoilManager.previewDays(player.serverLevel(), pos, days);
+        SoilCell before = SoilManager.getOrCreate(player.level(), pos);
+        SoilCell after = SoilManager.previewDays(player.level(), pos, days);
         var a = before.profile();
         var b = after.profile();
         player.sendSystemMessage(Component.literal("Read-only " + days + " TFC-day preview for Soil Cell ["
@@ -422,7 +422,7 @@ public final class SoilCommands {
     private static int reset(ServerPlayer player) {
         BlockPos pos = targetPos(player);
         if (pos == null) return 0;
-        SoilManager.reset(player.serverLevel(), pos);
+        SoilManager.reset(player.level(), pos);
         player.sendSystemMessage(Component.literal("Reset this Soil Cell to deterministic TFC soil defaults.")
             .withStyle(ChatFormatting.YELLOW));
         return 1;
@@ -431,7 +431,7 @@ public final class SoilCommands {
     private static int set(ServerPlayer player, String stat, double value) {
         BlockPos pos = targetPos(player);
         if (pos == null) return 0;
-        SoilCell cell = SoilManager.setStat(player.serverLevel(), pos, stat, value);
+        SoilCell cell = SoilManager.setStat(player.level(), pos, stat, value);
         player.sendSystemMessage(Component.literal("Set " + stat + " -> " + value + " in Soil Cell ["
             + cell.cellX() + ", " + cell.cellZ() + "]").withStyle(ChatFormatting.YELLOW));
         return 1;
@@ -451,7 +451,7 @@ public final class SoilCommands {
     private static int ledgerScan(ServerPlayer player) {
         BlockPos pos = targetPos(player);
         if (pos == null) return 0;
-        FieldLedgerEntry entry = FieldLedgerManager.scanCurrent(player, player.serverLevel(), pos);
+        FieldLedgerEntry entry = FieldLedgerManager.scanCurrent(player, player.level(), pos);
         player.sendSystemMessage(Component.literal("Field Ledger updated: " + entry.dimension() + " cell ["
             + entry.cellX() + ", " + entry.cellZ() + "] | chunk [" + entry.chunkX() + ", " + entry.chunkZ()
             + "] | center X" + entry.centerX() + " Z" + entry.centerZ())
@@ -488,9 +488,9 @@ public final class SoilCommands {
     private static int ledgerFavorite(ServerPlayer player) {
         BlockPos pos = targetPos(player);
         if (pos == null) return 0;
-        var before = FieldLedgerManager.currentEntry(player, player.serverLevel(), pos);
+        var before = FieldLedgerManager.currentEntry(player, player.level(), pos);
         if (before.isEmpty()) return ledgerNotDiscovered(player);
-        boolean favorite = FieldLedgerManager.toggleFavorite(player, player.serverLevel(), pos);
+        boolean favorite = FieldLedgerManager.toggleFavorite(player, player.level(), pos);
         player.sendSystemMessage(Component.literal("Ledger cell favorite=" + favorite).withStyle(ChatFormatting.YELLOW));
         return 1;
     }
@@ -498,7 +498,7 @@ public final class SoilCommands {
     private static int ledgerNote(ServerPlayer player, String note) {
         BlockPos pos = targetPos(player);
         if (pos == null) return 0;
-        if (!FieldLedgerManager.setNote(player, player.serverLevel(), pos, note)) return ledgerNotDiscovered(player);
+        if (!FieldLedgerManager.setNote(player, player.level(), pos, note)) return ledgerNotDiscovered(player);
         player.sendSystemMessage(Component.literal("Ledger note saved for this Soil Cell.").withStyle(ChatFormatting.GREEN));
         return 1;
     }
@@ -506,7 +506,7 @@ public final class SoilCommands {
     private static int ledgerEvents(ServerPlayer player) {
         BlockPos pos = targetPos(player);
         if (pos == null) return 0;
-        FieldLedgerEntry entry = FieldLedgerManager.currentEntry(player, player.serverLevel(), pos).orElse(null);
+        FieldLedgerEntry entry = FieldLedgerManager.currentEntry(player, player.level(), pos).orElse(null);
         if (entry == null) return ledgerNotDiscovered(player);
         player.sendSystemMessage(Component.literal("Recent Field Ledger events for cell [" + entry.cellX() + ", " + entry.cellZ() + "]")
             .withStyle(ChatFormatting.GOLD));
@@ -538,7 +538,7 @@ public final class SoilCommands {
     private static int ledgerFieldCreate(ServerPlayer player, String name) {
         BlockPos pos = targetPos(player);
         if (pos == null) return 0;
-        var field = FieldLedgerManager.createFieldWithCell(player, player.serverLevel(), pos, name);
+        var field = FieldLedgerManager.createFieldWithCell(player, player.level(), pos, name);
         if (field.isEmpty()) return ledgerNotDiscovered(player);
         player.sendSystemMessage(Component.literal("Created Field #" + field.get().id() + " ‘" + field.get().name()
             + "’ and assigned this Soil Cell.").withStyle(ChatFormatting.GREEN));
@@ -548,7 +548,7 @@ public final class SoilCommands {
     private static int ledgerFieldAssign(ServerPlayer player, int id) {
         BlockPos pos = targetPos(player);
         if (pos == null) return 0;
-        if (!FieldLedgerManager.assignCurrentCell(player, player.serverLevel(), pos, id)) {
+        if (!FieldLedgerManager.assignCurrentCell(player, player.level(), pos, id)) {
             player.sendSystemMessage(Component.literal("Could not assign this cell. Scan it first and verify Field #" + id + " exists.")
                 .withStyle(ChatFormatting.RED));
             return 0;
@@ -560,7 +560,7 @@ public final class SoilCommands {
     private static int ledgerFieldClear(ServerPlayer player) {
         BlockPos pos = targetPos(player);
         if (pos == null) return 0;
-        if (!FieldLedgerManager.clearCurrentField(player, player.serverLevel(), pos)) return ledgerNotDiscovered(player);
+        if (!FieldLedgerManager.clearCurrentField(player, player.level(), pos)) return ledgerNotDiscovered(player);
         player.sendSystemMessage(Component.literal("Removed this Soil Cell from its named Field.").withStyle(ChatFormatting.YELLOW));
         return 1;
     }
@@ -614,13 +614,13 @@ public final class SoilCommands {
 
     private static SoilCell targetCell(ServerPlayer player) {
         BlockPos pos = targetPos(player);
-        return pos == null ? null : SoilManager.getOrCreate(player.serverLevel(), pos);
+        return pos == null ? null : SoilManager.getOrCreate(player.level(), pos);
     }
 
     private static BlockPos targetPos(ServerPlayer player) {
         BlockPos feet = player.blockPosition();
-        BlockPos target = SoilTargeting.find(player.serverLevel(), feet.below())
-            .or(() -> SoilTargeting.find(player.serverLevel(), feet))
+        BlockPos target = SoilTargeting.find(player.level(), feet.below())
+            .or(() -> SoilTargeting.find(player.level(), feet))
             .orElse(null);
         if (target == null) {
             player.sendSystemMessage(Component.literal("Stand on or immediately above a soil block to inspect its Soil Cell.")

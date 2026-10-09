@@ -6,7 +6,7 @@ import com.foundations.soil.network.SoilHudTools;
 import java.util.List;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 
 public final class SoilHudOverlay {
     private static final int TEXT_COLOR = 0xFFF2F2F2;
@@ -20,7 +20,7 @@ public final class SoilHudOverlay {
 
     private SoilHudOverlay() {}
 
-    public static void render(GuiGraphics graphics, DeltaTracker deltaTracker) {
+    public static void render(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
@@ -40,7 +40,7 @@ public final class SoilHudOverlay {
         int color = detailed ? DETAIL_COLOR : TEXT_COLOR;
 
         for (int i = 0; i < lines.size(); i++) {
-            graphics.drawCenteredString(mc.font, lines.get(i), x, y + i * lineHeight, color);
+            graphics.centeredText(mc.font, lines.get(i), x, y + i * lineHeight, color);
         }
     }
 }

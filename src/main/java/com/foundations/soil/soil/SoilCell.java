@@ -430,57 +430,57 @@ public final class SoilCell {
     }
 
     public static SoilCell load(CompoundTag tag) {
-        int schema = tag.contains("schema", Tag.TAG_INT) ? tag.getInt("schema") : 1;
-        int model = tag.contains("model", Tag.TAG_INT) ? tag.getInt("model") : 1;
+        int schema = com.foundations.soil.storage.NbtAccess.contains(tag, "schema", Tag.TAG_INT) ? tag.getInt("schema").orElse(0) : 1;
+        int model = com.foundations.soil.storage.NbtAccess.contains(tag, "model", Tag.TAG_INT) ? tag.getInt("model").orElse(0) : 1;
         if (schema > SCHEMA_VERSION) throw new IllegalStateException("Foundations Soil cell schema " + schema + " is newer than supported schema " + SCHEMA_VERSION);
         if (model > MODEL_VERSION) throw new IllegalStateException("Foundations Soil cell model " + model + " is newer than supported model " + MODEL_VERSION);
 
         SoilProfile profile = new SoilProfile(
-            tag.getDouble("organic_matter"), tag.getDouble("ph"), tag.getDouble("drainage"),
-            tag.getDouble("compaction"), tag.getDouble("structure"), tag.getDouble("biology"),
-            tag.getDouble("salinity")
+            tag.getDouble("organic_matter").orElse(0.0), tag.getDouble("ph").orElse(0.0), tag.getDouble("drainage").orElse(0.0),
+            tag.getDouble("compaction").orElse(0.0), tag.getDouble("structure").orElse(0.0), tag.getDouble("biology").orElse(0.0),
+            tag.getDouble("salinity").orElse(0.0)
         );
-        int sampleY = tag.contains("sample_y", Tag.TAG_INT) ? tag.getInt("sample_y") : 64;
-        long simDay = tag.contains("last_simulated_day", Tag.TAG_LONG) ? tag.getLong("last_simulated_day") : 0L;
-        SoilCell cell = new SoilCell(tag.getInt("cell_x"), tag.getInt("cell_z"), sampleY, profile, tag.getLong("last_tfc_tick"), simDay);
-        if (tag.contains("physical", Tag.TAG_COMPOUND)) {
-            CompoundTag physical = tag.getCompound("physical");
-            cell.initializePhysical(new SoilTexture(physical.getDouble("sand"), physical.getDouble("silt"), physical.getDouble("clay")), physical.getString("source"));
+        int sampleY = com.foundations.soil.storage.NbtAccess.contains(tag, "sample_y", Tag.TAG_INT) ? tag.getInt("sample_y").orElse(0) : 64;
+        long simDay = com.foundations.soil.storage.NbtAccess.contains(tag, "last_simulated_day", Tag.TAG_LONG) ? tag.getLong("last_simulated_day").orElse(0L) : 0L;
+        SoilCell cell = new SoilCell(tag.getInt("cell_x").orElse(0), tag.getInt("cell_z").orElse(0), sampleY, profile, tag.getLong("last_tfc_tick").orElse(0L), simDay);
+        if (com.foundations.soil.storage.NbtAccess.contains(tag, "physical", Tag.TAG_COMPOUND)) {
+            CompoundTag physical = tag.getCompound("physical").orElseThrow(() -> new IllegalStateException("Expected saved compound"));
+            cell.initializePhysical(new SoilTexture(physical.getDouble("sand").orElse(0.0), physical.getDouble("silt").orElse(0.0), physical.getDouble("clay").orElse(0.0)), physical.getString("source").orElse(""));
         }
-        cell.plantingKnownMask = tag.getInt("planting_known") & 0xffff;
-        cell.plantingPresentMask = tag.getInt("planting_present") & cell.plantingKnownMask;
-        cell.monitoring = tag.getBoolean("monitoring");
-        if (cell.monitoring) cell.trend.load(tag.getList("trend", Tag.TAG_COMPOUND));
-        cell.amendmentApplications = nonNegative(tag.getInt("amendment_applications"));
-        cell.cropCycles = nonNegative(tag.getInt("crop_cycles"));
-        cell.continuousCropCycles = nonNegative(tag.getInt("continuous_crop_cycles"));
-        cell.daysBare = Math.max(0, tag.getLong("days_bare"));
-        cell.daysCovered = Math.max(0, tag.getLong("days_covered"));
-        cell.organicInputs = nonNegative(tag.getInt("organic_inputs"));
-        cell.disturbanceEvents = nonNegative(tag.getInt("disturbance_events"));
-        cell.waterloggingEvents = nonNegative(tag.getInt("waterlogging_events"));
-        cell.compactionEvents = nonNegative(tag.getInt("compaction_events"));
-        cell.activePlantings = Math.min(16, nonNegative(tag.getInt("active_plantings")));
-        cell.currentCropFamily = tag.getString("current_crop_family");
-        cell.lastHarvestFamily = tag.getString("last_harvest_family");
-        cell.continuousPressure = unit(tag.getDouble("continuous_pressure"));
-        cell.organicReserve = unit(tag.getDouble("organic_reserve"));
-        cell.organicReserveRate = tag.contains("organic_reserve_rate", Tag.TAG_DOUBLE) ? finiteNonNegative(tag.getDouble("organic_reserve_rate")) : 0.030;
-        cell.residueReserve = unit(tag.getDouble("residue_reserve"));
-        cell.recentAmendmentLoad = finiteNonNegative(tag.getDouble("recent_amendment_load"));
+        cell.plantingKnownMask = tag.getInt("planting_known").orElse(0) & 0xffff;
+        cell.plantingPresentMask = tag.getInt("planting_present").orElse(0) & cell.plantingKnownMask;
+        cell.monitoring = tag.getBoolean("monitoring").orElse(false);
+        if (cell.monitoring) cell.trend.load(com.foundations.soil.storage.SavedTagChecks.compounds(tag, "trend", false));
+        cell.amendmentApplications = nonNegative(tag.getInt("amendment_applications").orElse(0));
+        cell.cropCycles = nonNegative(tag.getInt("crop_cycles").orElse(0));
+        cell.continuousCropCycles = nonNegative(tag.getInt("continuous_crop_cycles").orElse(0));
+        cell.daysBare = Math.max(0, tag.getLong("days_bare").orElse(0L));
+        cell.daysCovered = Math.max(0, tag.getLong("days_covered").orElse(0L));
+        cell.organicInputs = nonNegative(tag.getInt("organic_inputs").orElse(0));
+        cell.disturbanceEvents = nonNegative(tag.getInt("disturbance_events").orElse(0));
+        cell.waterloggingEvents = nonNegative(tag.getInt("waterlogging_events").orElse(0));
+        cell.compactionEvents = nonNegative(tag.getInt("compaction_events").orElse(0));
+        cell.activePlantings = Math.min(16, nonNegative(tag.getInt("active_plantings").orElse(0)));
+        cell.currentCropFamily = tag.getString("current_crop_family").orElse("");
+        cell.lastHarvestFamily = tag.getString("last_harvest_family").orElse("");
+        cell.continuousPressure = unit(tag.getDouble("continuous_pressure").orElse(0.0));
+        cell.organicReserve = unit(tag.getDouble("organic_reserve").orElse(0.0));
+        cell.organicReserveRate = com.foundations.soil.storage.NbtAccess.contains(tag, "organic_reserve_rate", Tag.TAG_DOUBLE) ? finiteNonNegative(tag.getDouble("organic_reserve_rate").orElse(0.0)) : 0.030;
+        cell.residueReserve = unit(tag.getDouble("residue_reserve").orElse(0.0));
+        cell.recentAmendmentLoad = finiteNonNegative(tag.getDouble("recent_amendment_load").orElse(0.0));
         if (tag.contains("pending_amendments")) {
             ListTag pending = com.foundations.soil.storage.SavedTagChecks.compounds(tag, "pending_amendments", false);
             if (pending.size() > 256) throw new IllegalStateException("Oversized persisted amendment queue");
             for (int i = 0; i < pending.size(); i++) {
-                cell.pendingAmendments.add(PendingAmendmentEffect.load(pending.getCompound(i)));
+                cell.pendingAmendments.add(PendingAmendmentEffect.load(pending.getCompound(i).orElseThrow(() -> new IllegalStateException("Expected saved compound"))));
             }
         }
-        cell.lastAmendmentId = tag.getString("last_amendment_id");
-        cell.lastAmendmentDay = tag.contains("last_amendment_day", Tag.TAG_LONG) ? tag.getLong("last_amendment_day") : -1L;
-        cell.lastAmendmentAmount = finiteNonNegative(tag.getDouble("last_amendment_amount"));
-        cell.lastAmendmentUnit = tag.getString("last_amendment_unit");
-        cell.lastAmendmentConcentration = tag.contains("last_amendment_concentration", Tag.TAG_DOUBLE)
-            ? finiteNonNegative(tag.getDouble("last_amendment_concentration")) : 1.0;
+        cell.lastAmendmentId = tag.getString("last_amendment_id").orElse("");
+        cell.lastAmendmentDay = com.foundations.soil.storage.NbtAccess.contains(tag, "last_amendment_day", Tag.TAG_LONG) ? tag.getLong("last_amendment_day").orElse(0L) : -1L;
+        cell.lastAmendmentAmount = finiteNonNegative(tag.getDouble("last_amendment_amount").orElse(0.0));
+        cell.lastAmendmentUnit = tag.getString("last_amendment_unit").orElse("");
+        cell.lastAmendmentConcentration = com.foundations.soil.storage.NbtAccess.contains(tag, "last_amendment_concentration", Tag.TAG_DOUBLE)
+            ? finiteNonNegative(tag.getDouble("last_amendment_concentration").orElse(0.0)) : 1.0;
         // Only 1a cells need the one-time Living Soil baseline. 2a/3a cells migrate while retaining their existing seven soil statistics.
         cell.simulationBaselinePending = schema < 2 || model < 2;
         return cell;

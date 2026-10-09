@@ -1,7 +1,6 @@
 package com.foundations.soil.event;
 
 import com.foundations.soil.FoundationsSoil;
-import com.foundations.soil.amendment.AmendmentDefinition;
 import com.foundations.soil.amendment.AmendmentRegistry;
 import com.foundations.soil.api.FoundationsSoilApi;
 import com.foundations.soil.registry.SoilFluids;
@@ -11,95 +10,61 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.fluids.capability.IFluidHandlerItem;
+import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.access.ItemAccess;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
 
-/**
- * Lets any NeoForge fluid container apply a registered Foundations Soil amendment fluid directly to soil.
- * The container can come from TFC or another mod; Soil only drains the physical fluid and applies its agronomy dose.
- */
+/** Native transfer transactions replace legacy simulate/drain/refill container handling. */
 @EventBusSubscriber(modid = FoundationsSoil.MOD_ID)
 public final class LiquidAmendmentUseEvents {
     private LiquidAmendmentUseEvents() {}
-
     @SubscribeEvent
-    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+    public static void use(PlayerInteractEvent.RightClickBlock event) {
+        if (event.isCanceled()) return;
         var target = SoilTargeting.find(event.getLevel(), event.getPos());
         if (target.isEmpty()) return;
-
-        ItemStack stack = event.getItemStack();
-        if (stack.isEmpty() || stack.getCount() != 1) return;
-
-        IFluidHandlerItem handler = stack.getCapability(Capabilities.FluidHandler.ITEM);
+        var access = ItemAccess.forPlayerInteraction(event.getEntity(), event.getHand());
+        ResourceHandler<FluidResource> handler = access.getCapability(Capabilities.Fluid.ITEM);
         if (handler == null) return;
-
         Candidate candidate = findCandidate(handler);
         if (candidate == null) return;
-
-        // Cancel on both sides so a bucket does not place a source block on top of the soil before the server handles it.
         event.setCancellationResult(InteractionResult.SUCCESS);
         event.setCanceled(true);
-        if (event.getLevel().isClientSide()) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-
-        AmendmentDefinition definition = AmendmentRegistry.get(candidate.family().amendmentId()).orElse(null);
+        var definition = AmendmentRegistry.get(candidate.family().amendmentId()).orElse(null);
         if (definition == null || !definition.form().isLiquid()) {
-            player.displayClientMessage(Component.literal("Liquid amendment definition is unavailable: "
-                + candidate.family().amendmentId()).withStyle(ChatFormatting.RED), true);
+            player.sendOverlayMessage(Component.literal("Liquid amendment definition unavailable").withStyle(ChatFormatting.RED));
             return;
         }
-
-        int maxAmount = (int) Math.floor(Math.min(Integer.MAX_VALUE, definition.maxSingleAmount()));
-        int requested = Math.min(candidate.stack().getAmount(), Math.max(1, maxAmount));
-        FluidStack request = candidate.stack().copyWithAmount(requested);
-        FluidStack simulated = handler.drain(request, IFluidHandler.FluidAction.SIMULATE);
-        if (simulated.isEmpty()) return;
-
-        FluidStack drained = simulated;
-        if (!player.getAbilities().instabuild) {
-            drained = handler.drain(simulated, IFluidHandler.FluidAction.EXECUTE);
-            if (drained.isEmpty()) return;
-            player.setItemInHand(event.getHand(), handler.getContainer());
-        }
-
-        String containerId = String.valueOf(BuiltInRegistries.ITEM.getKey(stack.getItem()));
-        try {
-            var receipt = FoundationsSoilApi.applyLiquidAmendment(player.serverLevel(), target.get(),
-                candidate.family().amendmentId(), drained.getAmount(), 1.0,
-                "container:" + containerId + ":player:" + player.getUUID());
-
-            player.displayClientMessage(Component.literal(
-                definition.displayName() + " applied | " + drained.getAmount() + " mB"
-                    + " | normalized dose " + String.format(java.util.Locale.ROOT, "%.2f", receipt.normalizedDose())
-                    + (receipt.pendingReleases() > 0 ? " | release pending " + receipt.pendingReleases() : ""))
-                .withStyle(ChatFormatting.GREEN), true);
-        } catch (RuntimeException ex) {
-            if (!player.getAbilities().instabuild && !drained.isEmpty()) {
-                handler.fill(drained, IFluidHandler.FluidAction.EXECUTE);
-                player.setItemInHand(event.getHand(), handler.getContainer());
-            }
-            FoundationsSoil.LOGGER.error("[Foundations Soil] Failed to apply physical liquid amendment {} from {}",
-                candidate.family().name(), containerId, ex);
-            player.displayClientMessage(Component.literal("Unable to apply liquid amendment: " + ex.getMessage())
-                .withStyle(ChatFormatting.RED), true);
+        int requested = (int) Math.min(candidate.amount(), Math.max(1, Math.min(Integer.MAX_VALUE, Math.floor(definition.maxSingleAmount()))));
+        String container = String.valueOf(BuiltInRegistries.ITEM.getKey(event.getItemStack().getItem()));
+        try (Transaction transaction = Transaction.openRoot()) {
+            int taken = handler.extract(candidate.slot(), candidate.resource(), requested, transaction);
+            if (taken <= 0) return;
+            var receipt = FoundationsSoilApi.applyLiquidAmendment(player.level(), target.get(), candidate.family().amendmentId(),
+                taken, 1.0, "container:" + container + ":player:" + player.getUUID());
+            // Creative use deliberately rolls the container exchange back while retaining the soil dose.
+            if (!player.getAbilities().instabuild) transaction.commit();
+            player.sendOverlayMessage(Component.literal(definition.displayName() + " applied | " + taken + " mB | normalized dose "
+                + String.format(java.util.Locale.ROOT, "%.2f", receipt.normalizedDose())).withStyle(ChatFormatting.GREEN));
+        } catch (RuntimeException failure) {
+            FoundationsSoil.LOGGER.error("[Foundations Soil] Liquid application failed; uncommitted container transfer rolled back", failure);
+            player.sendOverlayMessage(Component.literal("Unable to apply liquid amendment: " + failure.getMessage()).withStyle(ChatFormatting.RED));
         }
     }
-
-    private static Candidate findCandidate(IFluidHandlerItem handler) {
-        for (int tank = 0; tank < handler.getTanks(); tank++) {
-            FluidStack stack = handler.getFluidInTank(tank);
-            if (stack.isEmpty()) continue;
-            var family = SoilFluids.family(stack.getFluid()).orElse(null);
-            if (family != null) return new Candidate(family, stack.copy());
+    private static Candidate findCandidate(ResourceHandler<FluidResource> handler) {
+        for (int slot = 0; slot < handler.size(); slot++) {
+            FluidResource resource = handler.getResource(slot);
+            if (resource.isEmpty() || handler.getAmountAsLong(slot) <= 0) continue;
+            var family = SoilFluids.family(resource.getFluid()).orElse(null);
+            if (family != null) return new Candidate(slot, family, resource, handler.getAmountAsLong(slot));
         }
         return null;
     }
-
-    private record Candidate(SoilFluids.FluidFamily family, FluidStack stack) {}
+    private record Candidate(int slot, SoilFluids.FluidFamily family, FluidResource resource, long amount) {}
 }

@@ -20,8 +20,8 @@ public final class SoilInitializer {
         double jitter = (((h >>> 11) & 0xffff) / 65535.0) - 0.5;
         double jitter2 = (((h >>> 29) & 0xffff) / 65535.0) - 0.5;
 
-        double rain = net.dries007.tfc.util.climate.Climate.getAverageRainfall(level, soilPos);
-        double temperature = net.dries007.tfc.util.climate.Climate.getAverageTemperature(level, soilPos);
+        double rain = com.foundations.soil.integration.TfcRuntime.averageRainfall(level, soilPos);
+        double temperature = com.foundations.soil.integration.TfcRuntime.averageTemperature(level, soilPos);
         double rainOffset = Double.isFinite(rain) ? Math.max(-1, Math.min(1, (rain - 250) / 250)) : 0;
         double temperatureOffset = Double.isFinite(temperature) ? Math.max(-1, Math.min(1, (temperature - 15) / 25)) : 0;
         return new SoilProfile(

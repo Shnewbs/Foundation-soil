@@ -3,7 +3,7 @@ package com.foundations.soil.soil;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -18,12 +18,12 @@ public final class SoilTargeting {
     }
 
     public static boolean isFarmland(BlockState state) {
-        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         return id != null && id.getPath().contains("farmland");
     }
 
     public static boolean isSoil(BlockState state) {
-        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         String path = id.getPath();
         if (id.getNamespace().equals("tfc")) {
             return path.contains("dirt") || path.contains("grass") || path.contains("farmland")

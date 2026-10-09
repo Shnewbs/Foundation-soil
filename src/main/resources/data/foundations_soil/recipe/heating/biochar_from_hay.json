@@ -1,8 +1,6 @@
 {
   "type": "tfc:heating",
-  "ingredient": {
-    "item": "minecraft:hay_block"
-  },
+  "ingredient": "minecraft:hay_block",
   "result_item": {
     "count": 4,
     "id": "foundations_soil:biochar"

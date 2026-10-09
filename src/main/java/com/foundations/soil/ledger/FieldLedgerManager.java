@@ -6,7 +6,7 @@ import com.foundations.soil.soil.SoilCellKey;
 import com.foundations.soil.soil.SoilManager;
 import java.util.List;
 import java.util.Optional;
-import net.dries007.tfc.util.calendar.Calendars;
+import com.foundations.soil.integration.TfcRuntime;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -29,11 +29,11 @@ public final class FieldLedgerManager {
     }
 
     public static List<String> laboratoryReport(ServerPlayer player, LaboratorySelection selection) {
-        return SoilLaboratoryReports.describe(data(player.serverLevel().getServer()).ledger(player.getUUID()), selection);
+        return SoilLaboratoryReports.describe(data(player.level().getServer()).ledger(player.getUUID()), selection);
     }
 
     public static LedgerMutation.Result mutate(ServerPlayer player, LedgerMutation mutation) {
-        FieldLedgerData worldData = data(player.serverLevel().getServer());
+        FieldLedgerData worldData = data(player.level().getServer());
         LedgerMutation.Result result = mutation.apply(worldData.ledger(player.getUUID()));
         if (result.success()) {
             worldData.setDirty();
@@ -44,17 +44,17 @@ public final class FieldLedgerManager {
     }
 
     public static FieldLedgerEntry scan(ServerPlayer player, ServerLevel level, BlockPos soilPos, SoilCell cell) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         PlayerFieldLedger ledger = data.ledger(player.getUUID());
-        String dimension = level.dimension().location().toString();
+        String dimension = level.dimension().identifier().toString();
         String key = FieldLedgerEntry.key(dimension, cell.cellX(), cell.cellZ());
         boolean isNew = ledger.entry(key).isEmpty();
         SoilManager.enableMonitoring(level, cell);
-        FieldLedgerEntry entry = ledger.discover(dimension, cell.cellX(), cell.cellZ(), cell.sampleY(), Calendars.SERVER.getTicks());
-        entry.refresh(cell, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays());
+        FieldLedgerEntry entry = ledger.discover(dimension, cell.cellX(), cell.cellZ(), cell.sampleY(), TfcRuntime.ticks());
+        entry.refresh(cell, TfcRuntime.ticks(), TfcRuntime.days());
         entry.refreshTfc(level, soilPos);
         if (isNew) {
-            entry.addEvent(Calendars.SERVER.getTotalCalendarDays(), "Soil Cell discovered with Soil Probe");
+            entry.addEvent(TfcRuntime.days(), "Soil Cell discovered with Soil Probe");
             SoilEvents.bus().post(new SoilEvents.FieldDiscovered(player.getUUID(), dimension, entry.cellX(), entry.cellZ(),
                 entry.centerX(), entry.centerZ()));
         }
@@ -76,15 +76,15 @@ public final class FieldLedgerManager {
 
     private static int refreshAllDiscoveredInternal(MinecraftServer server, ServerLevel level, SoilCell cell, String eventText, Boolean amendmentOverApplied) {
         FieldLedgerData data = data(server);
-        String dimension = level.dimension().location().toString();
+        String dimension = level.dimension().identifier().toString();
         String key = FieldLedgerEntry.key(dimension, cell.cellX(), cell.cellZ());
         int updated = 0;
         for (var owner : data.ledgersSnapshot().entrySet()) {
             FieldLedgerEntry entry = owner.getValue().entry(key).orElse(null);
             if (entry == null) continue;
-            entry.refresh(cell, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays());
+            entry.refresh(cell, TfcRuntime.ticks(), TfcRuntime.days());
             if (eventText != null && !eventText.isBlank()) {
-                entry.addEvent(Calendars.SERVER.getTotalCalendarDays(), eventText);
+                entry.addEvent(TfcRuntime.days(), eventText);
                 if (amendmentOverApplied != null && !cell.lastAmendmentId().isBlank()) {
                     entry.setLastAmendmentOverApplied(amendmentOverApplied);
                 }
@@ -99,22 +99,22 @@ public final class FieldLedgerManager {
 
     /** Update a previously discovered entry after a gameplay mutation; never auto-discovers a new cell. */
     public static void refreshIfDiscovered(ServerPlayer player, ServerLevel level, SoilCell cell, String eventText) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         PlayerFieldLedger ledger = data.ledger(player.getUUID());
-        String key = FieldLedgerEntry.key(level.dimension().location().toString(), cell.cellX(), cell.cellZ());
+        String key = FieldLedgerEntry.key(level.dimension().identifier().toString(), cell.cellX(), cell.cellZ());
         FieldLedgerEntry entry = ledger.entry(key).orElse(null);
         if (entry == null) return;
-        entry.refresh(cell, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays());
-        if (eventText != null && !eventText.isBlank()) entry.addEvent(Calendars.SERVER.getTotalCalendarDays(), eventText);
-        SoilEvents.bus().post(new SoilEvents.FieldUpdated(player.getUUID(), level.dimension().location().toString(),
+        entry.refresh(cell, TfcRuntime.ticks(), TfcRuntime.days());
+        if (eventText != null && !eventText.isBlank()) entry.addEvent(TfcRuntime.days(), eventText);
+        SoilEvents.bus().post(new SoilEvents.FieldUpdated(player.getUUID(), level.dimension().identifier().toString(),
             entry.cellX(), entry.cellZ(), entry.fieldId(), "cell_refreshed"));
         data.setDirty();
     }
 
     public static Optional<FieldLedgerEntry> currentEntry(ServerPlayer player, ServerLevel level, BlockPos soilPos) {
         SoilCellKey key = SoilCellKey.from(soilPos);
-        return data(player.serverLevel().getServer()).ledger(player.getUUID()).entry(
-            FieldLedgerEntry.key(level.dimension().location().toString(), key.cellX(), key.cellZ()));
+        return data(player.level().getServer()).ledger(player.getUUID()).entry(
+            FieldLedgerEntry.key(level.dimension().identifier().toString(), key.cellX(), key.cellZ()));
     }
 
     public static FieldLedgerEntry scanCurrent(ServerPlayer player, ServerLevel level, BlockPos soilPos) {
@@ -122,18 +122,18 @@ public final class FieldLedgerManager {
     }
 
     public static List<FieldLedgerEntry> entries(ServerPlayer player) {
-        return data(player.serverLevel().getServer()).ledger(player.getUUID()).sortedEntries();
+        return data(player.level().getServer()).ledger(player.getUUID()).sortedEntries();
     }
 
     public static List<FieldLedgerField> fields(ServerPlayer player) {
-        return data(player.serverLevel().getServer()).ledger(player.getUUID()).fields().stream().toList();
+        return data(player.level().getServer()).ledger(player.getUUID()).fields().stream().toList();
     }
 
-    public static int entryCount(ServerPlayer player) { return data(player.serverLevel().getServer()).ledger(player.getUUID()).entryCount(); }
-    public static int fieldCount(ServerPlayer player) { return data(player.serverLevel().getServer()).ledger(player.getUUID()).fieldCount(); }
+    public static int entryCount(ServerPlayer player) { return data(player.level().getServer()).ledger(player.getUUID()).entryCount(); }
+    public static int fieldCount(ServerPlayer player) { return data(player.level().getServer()).ledger(player.getUUID()).fieldCount(); }
 
     public static boolean toggleFavorite(ServerPlayer player, ServerLevel level, BlockPos soilPos) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         FieldLedgerEntry entry = currentEntry(player, level, soilPos).orElse(null);
         if (entry == null) return false;
         entry.setFavorite(!entry.favorite());
@@ -143,7 +143,7 @@ public final class FieldLedgerManager {
     }
 
     public static boolean setNote(ServerPlayer player, ServerLevel level, BlockPos soilPos, String note) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         FieldLedgerEntry entry = currentEntry(player, level, soilPos).orElse(null);
         if (entry == null) return false;
         entry.setNote(note);
@@ -153,7 +153,7 @@ public final class FieldLedgerManager {
     }
 
     public static Optional<FieldLedgerField> createFieldWithCell(ServerPlayer player, ServerLevel level, BlockPos soilPos, String name) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         PlayerFieldLedger ledger = data.ledger(player.getUUID());
         FieldLedgerEntry entry = currentEntry(player, level, soilPos).orElse(null);
         if (entry == null) return Optional.empty();
@@ -165,7 +165,7 @@ public final class FieldLedgerManager {
     }
 
     public static boolean assignCurrentCell(ServerPlayer player, ServerLevel level, BlockPos soilPos, int fieldId) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         PlayerFieldLedger ledger = data.ledger(player.getUUID());
         if (ledger.field(fieldId).isEmpty()) return false;
         FieldLedgerEntry entry = currentEntry(player, level, soilPos).orElse(null);
@@ -177,7 +177,7 @@ public final class FieldLedgerManager {
     }
 
     public static boolean clearCurrentField(ServerPlayer player, ServerLevel level, BlockPos soilPos) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         FieldLedgerEntry entry = currentEntry(player, level, soilPos).orElse(null);
         if (entry == null) return false;
         entry.setFieldId(0);
@@ -187,7 +187,7 @@ public final class FieldLedgerManager {
     }
 
     public static boolean renameField(ServerPlayer player, int fieldId, String name) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         FieldLedgerField field = data.ledger(player.getUUID()).field(fieldId).orElse(null);
         if (field == null) return false;
         field.setName(name);
@@ -197,7 +197,7 @@ public final class FieldLedgerManager {
     }
 
     public static boolean setFieldNote(ServerPlayer player, int fieldId, String note) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         FieldLedgerField field = data.ledger(player.getUUID()).field(fieldId).orElse(null);
         if (field == null) return false;
         field.setNote(note);
@@ -207,7 +207,7 @@ public final class FieldLedgerManager {
     }
 
     public static boolean toggleFieldFavorite(ServerPlayer player, int fieldId) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         FieldLedgerField field = data.ledger(player.getUUID()).field(fieldId).orElse(null);
         if (field == null) return false;
         field.setFavorite(!field.favorite());
@@ -217,7 +217,7 @@ public final class FieldLedgerManager {
     }
 
     public static boolean deleteField(ServerPlayer player, int fieldId) {
-        FieldLedgerData data = data(player.serverLevel().getServer());
+        FieldLedgerData data = data(player.level().getServer());
         boolean changed = data.ledger(player.getUUID()).deleteField(fieldId);
         if (changed) {
             postFieldUpdated(player, fieldId, "field_deleted");
@@ -227,7 +227,7 @@ public final class FieldLedgerManager {
     }
 
     private static void postEntryUpdated(ServerPlayer player, ServerLevel level, FieldLedgerEntry entry, String action) {
-        SoilEvents.bus().post(new SoilEvents.FieldUpdated(player.getUUID(), level.dimension().location().toString(),
+        SoilEvents.bus().post(new SoilEvents.FieldUpdated(player.getUUID(), level.dimension().identifier().toString(),
             entry.cellX(), entry.cellZ(), entry.fieldId(), action));
     }
 
@@ -236,6 +236,6 @@ public final class FieldLedgerManager {
     }
 
     public static int fieldMembers(ServerPlayer player, int fieldId) {
-        return data(player.serverLevel().getServer()).ledger(player.getUUID()).members(fieldId);
+        return data(player.level().getServer()).ledger(player.getUUID()).members(fieldId);
     }
 }

@@ -6,10 +6,10 @@ import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record LedgerEditPayload(UUID requestId, LedgerMutation mutation, int fieldOffset, int cellOffset) implements CustomPacketPayload {
-    public static final Type<LedgerEditPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "ledger_edit"));
+    public static final Type<LedgerEditPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "ledger_edit"));
     public static final StreamCodec<RegistryFriendlyByteBuf, LedgerEditPayload> STREAM_CODEC = new StreamCodec<>() {
         public LedgerEditPayload decode(RegistryFriendlyByteBuf b) {
             return new LedgerEditPayload(b.readUUID(), new LedgerMutation(b.readEnum(LedgerMutation.Action.class),

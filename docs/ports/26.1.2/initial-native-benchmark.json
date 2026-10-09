@@ -1,0 +1,10 @@
+{
+  "kind":"model-storage-microbenchmark-not-server-TPS",
+  "java":"25.0.4.1",
+  "results":[
+    {"cells":1000,"initialize_ms":12.631,"key_snapshot_ms":1.943,"simulate_day_ms":1.783,"batch_250_p95_ms":0.657,"save_nbt_ms":4.824,"compress_ms":29.667,"load_compressed_ms":39.649,"compressed_bytes":7856,"allocated_heap_delta_bytes":1041696},
+    {"cells":10000,"initialize_ms":9.384,"key_snapshot_ms":1.062,"simulate_day_ms":3.383,"batch_250_p95_ms":0.127,"save_nbt_ms":44.958,"compress_ms":126.413,"load_compressed_ms":213.765,"compressed_bytes":71062,"allocated_heap_delta_bytes":6695648},
+    {"cells":50000,"initialize_ms":33.097,"key_snapshot_ms":6.781,"simulate_day_ms":27.463,"batch_250_p95_ms":0.095,"save_nbt_ms":87.786,"compress_ms":474.019,"load_compressed_ms":536.805,"compressed_bytes":351655,"allocated_heap_delta_bytes":25702568}
+  ],
+  "limitations":"No live TFC chunks, networking, server tick loop, or dedicated-server pack. Heap delta is approximate allocation, not retained heap."
+}

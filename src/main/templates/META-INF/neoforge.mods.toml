@@ -7,6 +7,8 @@ modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 description='''
+Native Minecraft 26.1.2 development port of the 0.1.0-beta feature set. Requires genuine native TFC and Framework.
+Compilation/model tests are not a completed gameplay or integration validation.
 Foundations Soil extends TerraFirmaCraft with persistent 4x4 living-soil cells, Field Ledger/Field Guide tools,
 and server-authoritative agronomy. Soil Probe diagnostics and saved field records combine TFC hydration and
 N/P/K snapshots with soil condition, crop history, amendment status, and delayed TFC-calendar release.

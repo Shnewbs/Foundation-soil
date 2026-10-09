@@ -4,7 +4,7 @@ import com.foundations.soil.api.SoilSnapshot;
 import java.util.UUID;
 import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /** Public event entry point plus immutable event payloads. */
 public final class SoilEvents {
@@ -18,20 +18,20 @@ public final class SoilEvents {
         return BUS.listen(type, consumer);
     }
 
-    public record CellInitialized(ResourceLocation dimension, BlockPos soilPos, SoilSnapshot snapshot) implements SoilEvent {}
-    public record CellChanged(ResourceLocation dimension, BlockPos soilPos, String reason, SoilSnapshot snapshot) implements SoilEvent {}
-    public record AmendmentApplied(ResourceLocation dimension, BlockPos soilPos, String amendmentId,
+    public record CellInitialized(Identifier dimension, BlockPos soilPos, SoilSnapshot snapshot) implements SoilEvent {}
+    public record CellChanged(Identifier dimension, BlockPos soilPos, String reason, SoilSnapshot snapshot) implements SoilEvent {}
+    public record AmendmentApplied(Identifier dimension, BlockPos soilPos, String amendmentId,
                                    double effectiveness, SoilSnapshot snapshot) implements SoilEvent {}
     /** Detailed 0.0.3a dose event; AmendmentApplied remains for v1 listeners. */
-    public record AmendmentDoseApplied(ResourceLocation dimension, BlockPos soilPos, String amendmentId,
+    public record AmendmentDoseApplied(Identifier dimension, BlockPos soilPos, String amendmentId,
                                        String form, double amount, String unit, double concentration,
                                        double normalizedDose, double effectiveness, boolean overApplied,
                                        String source, SoilSnapshot snapshot) implements SoilEvent {}
-    public record CropPlanted(ResourceLocation dimension, BlockPos soilPos, String family,
+    public record CropPlanted(Identifier dimension, BlockPos soilPos, String family,
                               SoilSnapshot snapshot) implements SoilEvent {}
-    public record CropRemoved(ResourceLocation dimension, BlockPos soilPos, String family, boolean mature,
+    public record CropRemoved(Identifier dimension, BlockPos soilPos, String family, boolean mature,
                               SoilSnapshot snapshot) implements SoilEvent {}
-    public record DailySimulation(ResourceLocation dimension, BlockPos soilPos, long fromDay, long toDay,
+    public record DailySimulation(Identifier dimension, BlockPos soilPos, long fromDay, long toDay,
                                   SoilSnapshot snapshot) implements SoilEvent {}
     public record FieldDiscovered(UUID playerId, String dimension, int cellX, int cellZ, int centerX, int centerZ)
         implements SoilEvent {}

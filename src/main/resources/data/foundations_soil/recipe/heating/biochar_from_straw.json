@@ -1,8 +1,6 @@
 {
   "type": "tfc:heating",
-  "ingredient": {
-    "item": "tfc:straw"
-  },
+  "ingredient": "tfc:straw",
   "result_item": {
     "count": 1,
     "id": "foundations_soil:biochar"

@@ -14,9 +14,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public final class SoilBlocks {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(FoundationsSoil.MOD_ID);
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(FoundationsSoil.MOD_ID);
-    public static final DeferredBlock<SoilLaboratoryBlock> LABORATORY = BLOCKS.register("soil_laboratory", () ->
-        new SoilLaboratoryBlock(BlockBehaviour.Properties.of().strength(2.5f).sound(SoundType.WOOD).noOcclusion()));
-    public static final DeferredItem<BlockItem> LABORATORY_ITEM = ITEMS.register("soil_laboratory", () -> new BlockItem(LABORATORY.get(), new Item.Properties()));
+    public static final DeferredBlock<SoilLaboratoryBlock> LABORATORY = BLOCKS.registerBlock("soil_laboratory", SoilLaboratoryBlock::new,
+        () -> BlockBehaviour.Properties.of().strength(2.5f).sound(SoundType.WOOD).noOcclusion());
+    public static final DeferredItem<BlockItem> LABORATORY_ITEM = ITEMS.registerItem("soil_laboratory", props -> new BlockItem(LABORATORY.get(), props.useBlockDescriptionPrefix()));
     private SoilBlocks() {}
     public static void register(IEventBus bus) { BLOCKS.register(bus); ITEMS.register(bus); }
 }

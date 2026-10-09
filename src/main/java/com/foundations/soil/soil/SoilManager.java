@@ -10,9 +10,8 @@ import com.foundations.soil.crop.CropFamily;
 import com.foundations.soil.crop.CropRegistry;
 import com.foundations.soil.ledger.FieldLedgerManager;
 import java.util.Optional;
-import net.dries007.tfc.common.blocks.soil.FarmlandBlock;
-import net.dries007.tfc.util.calendar.Calendars;
-import net.dries007.tfc.util.climate.Climate;
+import com.foundations.soil.integration.TfcRuntime;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -31,8 +30,8 @@ public final class SoilManager {
     public static SoilCell getOrCreate(ServerLevel level, BlockPos soilPos) {
         SoilCellKey key = SoilCellKey.from(soilPos);
         SoilWorldData world = data(level);
-        long tick = Calendars.SERVER.getTicks();
-        long day = Calendars.SERVER.getTotalCalendarDays();
+        long tick = TfcRuntime.ticks();
+        long day = TfcRuntime.days();
         SoilCell cell = world.get(key).orElse(null);
         boolean created = cell == null;
         if (created) {
@@ -44,7 +43,7 @@ public final class SoilManager {
             cell.initializePhysical(SoilTexture.forSoil(soilId), soilId);
             world.setDirty();
         }
-        if (created) SoilEvents.bus().post(new SoilEvents.CellInitialized(level.dimension().location(), soilPos.immutable(), SoilSnapshots.from(cell)));
+        if (created) SoilEvents.bus().post(new SoilEvents.CellInitialized(level.dimension().identifier(), soilPos.immutable(), SoilSnapshots.from(cell)));
         if (cell.sampleY() != soilPos.getY()) world.setDirty();
         cell.touch(tick, soilPos.getY());
         long beforeDay = cell.lastSimulatedDay();
@@ -70,20 +69,20 @@ public final class SoilManager {
             throw new IllegalArgumentException("Normalized amendment dose " + normalized + " exceeds server maximum " + SoilConfig.MAX_NORMALIZED_AMENDMENT_DOSE.get());
         }
         SoilCell cell = getOrCreate(level, soilPos);
-        long tick = Calendars.SERVER.getTicks();
-        long day = Calendars.SERVER.getTotalCalendarDays();
+        long tick = TfcRuntime.ticks();
+        long day = TfcRuntime.days();
         AmendmentApplicationOutcome outcome = cell.applyDose(amendment, amount, unit, concentration, tick, day,
             SoilConfig.AMENDMENT_DIMINISHING_STRENGTH.get(), SoilConfig.effectiveAmendmentStrength(),
             SoilConfig.MAX_PENDING_AMENDMENT_RELEASES.get());
         data(level).setDirty();
         var snapshot = SoilSnapshots.from(cell);
         String actualSource = source == null || source.isBlank() ? "unknown" : source;
-        SoilEvents.bus().post(new SoilEvents.AmendmentApplied(level.dimension().location(), soilPos.immutable(),
+        SoilEvents.bus().post(new SoilEvents.AmendmentApplied(level.dimension().identifier(), soilPos.immutable(),
             amendment.id(), outcome.effectiveness(), snapshot));
-        SoilEvents.bus().post(new SoilEvents.AmendmentDoseApplied(level.dimension().location(), soilPos.immutable(),
+        SoilEvents.bus().post(new SoilEvents.AmendmentDoseApplied(level.dimension().identifier(), soilPos.immutable(),
             amendment.id(), amendment.form().name().toLowerCase(java.util.Locale.ROOT), amount, unit.name().toLowerCase(java.util.Locale.ROOT),
             concentration, outcome.normalizedDose(), outcome.effectiveness(), outcome.overApplied(), actualSource, snapshot));
-        SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().location(), soilPos.immutable(),
+        SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().identifier(), soilPos.immutable(),
             "amendment:" + amendment.id(), snapshot));
         String event = String.format(java.util.Locale.ROOT, "Applied %s: %.2f %s @ %.2fx%s", amendment.displayName(),
             amount, unit.shortName(), concentration, outcome.overApplied() ? " [OVERAPPLIED]" : "");
@@ -97,11 +96,11 @@ public final class SoilManager {
         SoilCell cell = getOrCreate(level, soilPos);
         CropFamily actual = family == null ? CropFamily.OTHER : family;
         if (!cell.markPlanting(soilPos.getX(), soilPos.getZ(), true)) return cell;
-        cell.recordPlanting(actual, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays(), soilPos.getY());
+        cell.recordPlanting(actual, TfcRuntime.ticks(), TfcRuntime.days(), soilPos.getY());
         data(level).setDirty();
         var snapshot = SoilSnapshots.from(cell);
-        SoilEvents.bus().post(new SoilEvents.CropPlanted(level.dimension().location(), soilPos.immutable(), actual.id(), snapshot));
-        SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().location(), soilPos.immutable(), "crop_planted", snapshot));
+        SoilEvents.bus().post(new SoilEvents.CropPlanted(level.dimension().identifier(), soilPos.immutable(), actual.id(), snapshot));
+        SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().identifier(), soilPos.immutable(), "crop_planted", snapshot));
         return cell;
     }
 
@@ -109,11 +108,11 @@ public final class SoilManager {
         SoilCell cell = getOrCreate(level, soilPos);
         CropFamily actual = family == null ? CropFamily.OTHER : family;
         if (!cell.markPlanting(soilPos.getX(), soilPos.getZ(), false)) return cell;
-        cell.recordCropRemoval(actual, mature, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays());
+        cell.recordCropRemoval(actual, mature, TfcRuntime.ticks(), TfcRuntime.days());
         data(level).setDirty();
         var snapshot = SoilSnapshots.from(cell);
-        SoilEvents.bus().post(new SoilEvents.CropRemoved(level.dimension().location(), soilPos.immutable(), actual.id(), mature, snapshot));
-        SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().location(), soilPos.immutable(),
+        SoilEvents.bus().post(new SoilEvents.CropRemoved(level.dimension().identifier(), soilPos.immutable(), actual.id(), mature, snapshot));
+        SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().identifier(), soilPos.immutable(),
             mature ? "crop_harvested" : "crop_removed", snapshot));
         return cell;
     }
@@ -124,14 +123,14 @@ public final class SoilManager {
         if (cell.markPlanting(soilPos.getX(), soilPos.getZ(), true)) {
             cell.reconcilePlantings(cell.activePlantings() + 1, actual.id());
         }
-        cell.recordPickingHarvest(actual, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays());
+        cell.recordPickingHarvest(actual, TfcRuntime.ticks(), TfcRuntime.days());
         data(level).setDirty();
         fireChanged(level, soilPos, cell, "crop_picked");
     }
 
     public static SoilCell recordDisturbance(ServerLevel level, BlockPos soilPos, double compaction, double structure) {
         SoilCell cell = getOrCreate(level, soilPos);
-        cell.recordDisturbance(compaction, structure, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays(), soilPos.getY());
+        cell.recordDisturbance(compaction, structure, TfcRuntime.ticks(), TfcRuntime.days(), soilPos.getY());
         data(level).setDirty();
         fireChanged(level, soilPos, cell, "disturbance");
         return cell;
@@ -139,7 +138,7 @@ public final class SoilManager {
 
     public static SoilCell reset(ServerLevel level, BlockPos soilPos) {
         SoilCell cell = getOrCreate(level, soilPos);
-        cell.resetTo(SoilInitializer.create(level, soilPos), soilPos.getY(), Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays());
+        cell.resetTo(SoilInitializer.create(level, soilPos), soilPos.getY(), TfcRuntime.ticks(), TfcRuntime.days());
         data(level).setDirty();
         fireChanged(level, soilPos, cell, "reset");
         return cell;
@@ -158,7 +157,7 @@ public final class SoilManager {
             case "salinity" -> new SoilProfile(p.organicMatter(), p.pH(), p.drainage(), p.compaction(), p.structure(), p.biology(), value);
             default -> throw new IllegalArgumentException("Unknown soil stat: " + stat);
         };
-        cell.replaceProfile(next, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays(), soilPos.getY());
+        cell.replaceProfile(next, TfcRuntime.ticks(), TfcRuntime.days(), soilPos.getY());
         data(level).setDirty();
         fireChanged(level, soilPos, cell, "set:" + stat);
         return cell;
@@ -178,7 +177,7 @@ public final class SoilManager {
         long targetDay = copy.lastSimulatedDay() + Math.max(0, days);
         BlockPos sample = samplePos(copy);
         SoilSimulationContext env = environment(level, sample);
-        SoilSimulator.advance(copy, targetDay, Calendars.SERVER.getTicks(), env, rates());
+        SoilSimulator.advance(copy, targetDay, TfcRuntime.ticks(), env, rates());
         return copy;
     }
 
@@ -188,7 +187,7 @@ public final class SoilManager {
         BlockPos sample = samplePos(cell);
         if (!level.hasChunkAt(sample)) return false;
         long beforeDay = cell.lastSimulatedDay();
-        boolean changed = advance(level, cell, currentDay, Calendars.SERVER.getTicks(), sample);
+        boolean changed = advance(level, cell, currentDay, TfcRuntime.ticks(), sample);
         if (changed) {
             data(level).setDirty();
             fireSimulation(level, sample, cell, beforeDay, currentDay);
@@ -205,12 +204,12 @@ public final class SoilManager {
 
     private static void fireSimulation(ServerLevel level, BlockPos pos, SoilCell cell, long fromDay, long toDay) {
         var snapshot = SoilSnapshots.from(cell);
-        SoilEvents.bus().post(new SoilEvents.DailySimulation(level.dimension().location(), pos.immutable(), fromDay, toDay, snapshot));
-        SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().location(), pos.immutable(), "daily_simulation", snapshot));
+        SoilEvents.bus().post(new SoilEvents.DailySimulation(level.dimension().identifier(), pos.immutable(), fromDay, toDay, snapshot));
+        SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().identifier(), pos.immutable(), "daily_simulation", snapshot));
     }
 
     private static void fireChanged(ServerLevel level, BlockPos pos, SoilCell cell, String reason) {
-        SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().location(), pos.immutable(), reason, SoilSnapshots.from(cell)));
+        SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().identifier(), pos.immutable(), reason, SoilSnapshots.from(cell)));
     }
 
     private static void reconcilePlantings(ServerLevel level, SoilCell cell) {
@@ -237,8 +236,8 @@ public final class SoilManager {
 
     private static SoilSimulationContext environment(ServerLevel level, BlockPos samplePos) {
         return new SoilSimulationContext(
-            Climate.getInstantTemperature(level, samplePos),
-            FarmlandBlock.getInstantHydration(level, samplePos) / 100.0
+            TfcRuntime.temperature(level, samplePos),
+            TfcRuntime.hydration(level, samplePos) / 100.0
         );
     }
 

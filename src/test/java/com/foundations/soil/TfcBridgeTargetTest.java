@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodInsnNode;
+@org.junit.jupiter.api.Tag("tfc-runtime")
 class TfcBridgeTargetTest {
     @Test void pinnedTfcContainsExactlyOneExpectedYieldHook() throws Exception {
         try(InputStream input=getClass().getResourceAsStream("/net/dries007/tfc/common/blocks/crop/CropHelpers.class")) {

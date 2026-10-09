@@ -6,9 +6,7 @@
     " B "
   ],
   "key": {
-    "B": {
-      "item": "tfc:burlap_cloth"
-    }
+    "B": "tfc:burlap_cloth"
   },
   "result": {
     "count": 1,

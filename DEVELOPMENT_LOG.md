@@ -1,3 +1,11 @@
+# Native 26.1.2 port implementation
+
+Migrated the full beta source to native Minecraft 26.1.2 / NeoForge 26.1.2.114 / Java 25: persistence codecs, identifiers, screen/input APIs, item/fluid definitions and transactions, plus a mandatory TFC runtime boundary. All main sources compile and 74 native model tests pass; 1k/10k/50k compressed round trips preserve every cell. Three TFC-dependent checks and all actual game/runtime acceptance remain unexecuted. No old dependency binary, target stub, or vanilla fallback is used.
+
+See [native validation](docs/ports/26.1.2/VALIDATION.md) for evidence and blockers. Earlier beta records below refer to 1.21.1.
+
+---
+
 # 0.1.0-beta integration - 2026-10-08 Pacific / 2026-10-09 UTC
 
 Implemented the intervening roadmap packages in one beta source change. Local Java 21 compilation and 70 standalone automated tests passed against the genuine pinned dependency classpath; 1k/10k/50k compressed cell round trips passed. The native GitHub build/release gate repeats compile/test/benchmark before publication. These are model/storage results, not a successful full-modpack launch.

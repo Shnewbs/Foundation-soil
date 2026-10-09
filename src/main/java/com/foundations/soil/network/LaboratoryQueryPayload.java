@@ -6,10 +6,10 @@ import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record LaboratoryQueryPayload(UUID requestId, long position, LaboratorySelection first, LaboratorySelection second) implements CustomPacketPayload {
-    public static final Type<LaboratoryQueryPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "laboratory_query"));
+    public static final Type<LaboratoryQueryPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "laboratory_query"));
     public static final StreamCodec<RegistryFriendlyByteBuf, LaboratoryQueryPayload> STREAM_CODEC = new StreamCodec<>() {
         public LaboratoryQueryPayload decode(RegistryFriendlyByteBuf b) { return new LaboratoryQueryPayload(b.readUUID(), b.readLong(), read(b), read(b)); }
         public void encode(RegistryFriendlyByteBuf b, LaboratoryQueryPayload p) { b.writeUUID(p.requestId); b.writeLong(p.position); write(b, p.first); write(b, p.second); }

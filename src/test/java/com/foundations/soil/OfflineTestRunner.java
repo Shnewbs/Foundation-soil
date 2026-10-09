@@ -7,6 +7,7 @@ public final class OfflineTestRunner {
     public static void main(String[] args) {
         var listener=new SummaryGeneratingListener();var launcher=LauncherFactory.create();
         var request=LauncherDiscoveryRequestBuilder.request().selectors(DiscoverySelectors.selectPackage("com.foundations.soil"))
+            .filters(org.junit.platform.launcher.TagFilter.excludeTags("tfc-runtime"))
             .configurationParameter("junit.jupiter.extensions.autodetection.enabled","true").build();
         launcher.registerTestExecutionListeners(listener);launcher.execute(request);
         listener.getSummary().printTo(new java.io.PrintWriter(System.out,true));

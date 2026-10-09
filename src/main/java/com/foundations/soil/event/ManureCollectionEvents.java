@@ -3,8 +3,7 @@ package com.foundations.soil.event;
 import com.foundations.soil.FoundationsSoil;
 import com.foundations.soil.config.SoilConfig;
 import com.foundations.soil.registry.SoilItems;
-import net.dries007.tfc.common.entities.livestock.TFCAnimalProperties;
-import net.dries007.tfc.util.calendar.Calendars;
+import com.foundations.soil.integration.TfcRuntime;
 import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
@@ -25,18 +24,18 @@ public final class ManureCollectionEvents {
     @SubscribeEvent
     public static void interact(PlayerInteractEvent.EntityInteract event) {
         if (!(event.getLevel() instanceof ServerLevel)) return;
-        if (!(event.getTarget() instanceof TFCAnimalProperties animal)) return;
-        if (animal.getEntity().isBaby()) return;
+        if (!TfcRuntime.isAnimal(event.getTarget()) || !(event.getTarget() instanceof net.minecraft.world.entity.AgeableMob animal)) return;
+        if (animal.isBaby()) return;
         if (!event.getItemStack().is(SoilItems.EMPTY_AMENDMENT_BAG.get())) return;
 
-        long day = Calendars.SERVER.getTotalCalendarDays();
-        var data = animal.getEntity().getPersistentData();
+        long day = TfcRuntime.days();
+        var data = animal.getPersistentData();
         int cooldown = SoilConfig.MANURE_COLLECTION_COOLDOWN_DAYS.get();
-        if (data.contains(LAST_COLLECTION_DAY, Tag.TAG_LONG)) {
-            long next = data.getLong(LAST_COLLECTION_DAY) + cooldown;
+        if (com.foundations.soil.storage.NbtAccess.contains(data, LAST_COLLECTION_DAY, Tag.TAG_LONG)) {
+            long next = data.getLong(LAST_COLLECTION_DAY).orElse(0L) + cooldown;
             if (day < next) {
-                event.getEntity().displayClientMessage(Component.literal("No collectable manure from this animal yet.")
-                    .withStyle(ChatFormatting.GRAY), true);
+                event.getEntity().sendOverlayMessage(Component.literal("No collectable manure from this animal yet.")
+                    .withStyle(ChatFormatting.GRAY));
                 event.setCancellationResult(InteractionResult.SUCCESS);
                 event.setCanceled(true);
                 return;
@@ -46,8 +45,8 @@ public final class ManureCollectionEvents {
         data.putLong(LAST_COLLECTION_DAY, day);
         ItemStack manure = new ItemStack(SoilItems.MANURE.get());
         if (!event.getEntity().getInventory().add(manure)) event.getEntity().drop(manure, false);
-        event.getEntity().displayClientMessage(Component.literal("Collected manure. Fill an amendment bag recipe, then apply it to soil.")
-            .withStyle(ChatFormatting.GREEN), true);
+        event.getEntity().sendOverlayMessage(Component.literal("Collected manure. Fill an amendment bag recipe, then apply it to soil.")
+            .withStyle(ChatFormatting.GREEN));
         event.setCancellationResult(InteractionResult.SUCCESS);
         event.setCanceled(true);
     }

@@ -26,7 +26,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.neoforged.fml.loading.FMLPaths;
 
 /** Loads pack-author editable agronomy definitions from config/foundations_soil. */
@@ -139,7 +139,7 @@ public final class AgronomyDefinitionLoader {
     }
 
     private static void loadCrop(Path path, JsonObject o) {
-        ResourceLocation id = ResourceLocation.tryParse(s(o, "id", ""));
+        Identifier id = Identifier.tryParse(s(o, "id", ""));
         if (id == null) throw new IllegalArgumentException("Crop definition requires valid namespaced id in " + path);
         CropFamily family = CropFamily.parse(s(o, "family", CropRegistry.inferFamily(id).id()));
         CropDefinition defaults = CropRegistry.familyDefinition(family).crop();

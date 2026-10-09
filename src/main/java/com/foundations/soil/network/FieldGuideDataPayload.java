@@ -10,11 +10,11 @@ import com.foundations.soil.ledger.FieldLedgerManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import net.dries007.tfc.util.calendar.Calendars;
+import com.foundations.soil.integration.TfcRuntime;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerPlayer;
 
 /** Bounded read-only server snapshot used by the Field Guide GUI. */
@@ -35,7 +35,7 @@ public record FieldGuideDataPayload(
     private static final int HARD_MAX_AMENDMENTS = 64;
 
     public static final Type<FieldGuideDataPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "field_guide_data")
+        Identifier.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "field_guide_data")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, FieldGuideDataPayload> STREAM_CODEC = new StreamCodec<>() {
@@ -122,7 +122,7 @@ public record FieldGuideDataPayload(
 
         return new FieldGuideDataPayload(List.copyOf(fields), List.copyOf(cells), List.copyOf(amendments),
             WarningView.server(), SoilConfig.preset(), SoilConfig.APPLICATIONS_PER_BAG.get(),
-            Math.max(0L, Calendars.SERVER.getTotalCalendarDays()), rawCells.size(),
+            Math.max(0L, TfcRuntime.days()), rawCells.size(),
             rawCells.size() > cells.size() || rawFields.size() > fields.size(), fieldOffset, cellOffset, rawFields.size());
     }
 

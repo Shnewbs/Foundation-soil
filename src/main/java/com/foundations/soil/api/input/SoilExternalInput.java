@@ -2,12 +2,12 @@ package com.foundations.soil.api.input;
 
 import java.util.Map;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 
 /** Immutable delivery request from an integration into a Soil compatibility channel. */
 public record SoilExternalInput(
-    ResourceLocation integration,
+    Identifier integration,
     SoilInputType type,
     ServerLevel level,
     BlockPos soilPos,

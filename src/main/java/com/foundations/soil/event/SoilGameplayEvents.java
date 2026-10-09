@@ -7,7 +7,7 @@ import com.foundations.soil.crop.CropRegistry;
 import com.foundations.soil.soil.SoilManager;
 import com.foundations.soil.soil.SoilTargeting;
 import java.util.Optional;
-import net.dries007.tfc.util.calendar.Calendars;
+import com.foundations.soil.integration.TfcRuntime;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.EventPriority;
@@ -26,7 +26,7 @@ public final class SoilGameplayEvents {
     public static void serverTick(ServerTickEvent.Post event) {
         if (!SoilConfig.DAILY_UPDATES.get()) return;
         if (event.getServer().getTickCount() % 20 != 0) return;
-        long day = Calendars.SERVER.getTotalCalendarDays();
+        long day = TfcRuntime.days();
         int budget = SoilConfig.SIMULATION_BATCH_SIZE.get();
         for (ServerLevel level : event.getServer().getAllLevels()) SoilSimulationScheduler.tick(level, day, budget);
     }
@@ -48,13 +48,13 @@ public final class SoilGameplayEvents {
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void broken(BlockEvent.BreakEvent event) {
+    public static void broken(net.neoforged.neoforge.event.level.block.BreakBlockEvent event) {
         if (event.isCanceled() || !(event.getLevel() instanceof ServerLevel level)) return;
         if (!CropRegistry.isCultivatedCrop(event.getState())) return;
         findSoilBelow(level, event.getPos()).ifPresent(soil -> {
             CropDefinition def = CropRegistry.resolve(event.getState());
-            boolean mature = level.getBlockEntity(soil.above()) instanceof net.dries007.tfc.common.blockentities.CropBlockEntity crop
-                ? crop.getGrowth() >= 1.0f : CropRegistry.isMature(event.getState());
+            boolean mature = TfcRuntime.isCrop(level.getBlockEntity(soil.above()))
+                ? TfcRuntime.growth(level.getBlockEntity(soil.above())) >= 1.0f : CropRegistry.isMature(event.getState());
             SoilManager.recordCropRemoval(level, soil, def.family(), mature);
         });
     }

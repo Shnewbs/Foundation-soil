@@ -7,18 +7,10 @@
     "BBB"
   ],
   "key": {
-    "G": {
-      "item": "minecraft:glass"
-    },
-    "P": {
-      "tag": "minecraft:planks"
-    },
-    "H": {
-      "item": "foundations_soil:soil_probe"
-    },
-    "B": {
-      "item": "tfc:metal/ingot/brass"
-    }
+    "G": "minecraft:glass",
+    "P": "#minecraft:planks",
+    "H": "foundations_soil:soil_probe",
+    "B": "tfc:metal/ingot/brass"
   },
   "result": {
     "id": "foundations_soil:soil_laboratory",

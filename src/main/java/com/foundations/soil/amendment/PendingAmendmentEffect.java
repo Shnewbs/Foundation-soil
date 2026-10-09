@@ -44,11 +44,11 @@ public record PendingAmendmentEffect(String amendmentId, double remainingDays, A
     }
 
     public static PendingAmendmentEffect load(CompoundTag tag) {
-        String id = tag.contains("id", Tag.TAG_STRING) ? tag.getString("id") : "legacy";
-        double days = Math.max(0.0, tag.getDouble("remaining_days"));
+        String id = com.foundations.soil.storage.NbtAccess.contains(tag, "id", Tag.TAG_STRING) ? tag.getString("id").orElse("") : "legacy";
+        double days = Math.max(0.0, tag.getDouble("remaining_days").orElse(0.0));
         return new PendingAmendmentEffect(id, days, new AmendmentEffect(
-            tag.getDouble("organic_matter"), tag.getDouble("ph"), tag.getDouble("drainage"),
-            tag.getDouble("compaction"), tag.getDouble("structure"), tag.getDouble("biology"), tag.getDouble("salinity")));
+            tag.getDouble("organic_matter").orElse(0.0), tag.getDouble("ph").orElse(0.0), tag.getDouble("drainage").orElse(0.0),
+            tag.getDouble("compaction").orElse(0.0), tag.getDouble("structure").orElse(0.0), tag.getDouble("biology").orElse(0.0), tag.getDouble("salinity").orElse(0.0)));
     }
 
     public record Release(AmendmentEffect released, PendingAmendmentEffect remaining, boolean completed) {}

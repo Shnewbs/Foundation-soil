@@ -8,16 +8,16 @@ import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /** Process-lifetime registry used for transparent integration diagnostics. */
 public final class SoilIntegrationRegistry {
-    private static final Map<ResourceLocation, Entry> ENTRIES = new ConcurrentHashMap<>();
+    private static final Map<Identifier, Entry> ENTRIES = new ConcurrentHashMap<>();
     private static final AtomicLong DUPLICATE_REGISTRATIONS = new AtomicLong();
 
     private SoilIntegrationRegistry() {}
 
-    public static void register(ResourceLocation id, String displayName, Set<String> capabilities) {
+    public static void register(Identifier id, String displayName, Set<String> capabilities) {
         if (id == null) throw new IllegalArgumentException("integration id cannot be null");
         ENTRIES.compute(id, (key, old) -> {
             if (old == null) return new Entry(displayName, capabilities);
@@ -33,12 +33,12 @@ public final class SoilIntegrationRegistry {
     }
 
     public static void register(String id, String displayName, String... capabilities) {
-        ResourceLocation parsed = ResourceLocation.tryParse(id);
+        Identifier parsed = Identifier.tryParse(id);
         if (parsed == null) throw new IllegalArgumentException("Invalid integration id: " + id);
         register(parsed, displayName, capabilities == null ? Set.of() : Set.copyOf(Arrays.asList(capabilities)));
     }
 
-    public static void record(ResourceLocation id, String kind) {
+    public static void record(Identifier id, String kind) {
         Entry entry = ENTRIES.get(id);
         if (entry == null) {
             register(id, id.toString(), Set.of());
@@ -50,8 +50,8 @@ public final class SoilIntegrationRegistry {
     public static int size() { return ENTRIES.size(); }
     public static long duplicateRegistrationsSuppressed() { return DUPLICATE_REGISTRATIONS.get(); }
 
-    public static Map<ResourceLocation, Snapshot> snapshot() {
-        Map<ResourceLocation, Snapshot> result = new TreeMap<>((a, b) -> a.toString().compareTo(b.toString()));
+    public static Map<Identifier, Snapshot> snapshot() {
+        Map<Identifier, Snapshot> result = new TreeMap<>((a, b) -> a.toString().compareTo(b.toString()));
         ENTRIES.forEach((id, entry) -> result.put(id, entry.snapshot()));
         return Collections.unmodifiableMap(result);
     }

@@ -1,14 +1,14 @@
 package com.foundations.soil;
 
 import com.foundations.soil.integration.SoilIntegrationRegistry;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SoilIntegrationRegistryTest {
     @Test
     void tracksCapabilitiesAndOperationCounters() {
-        ResourceLocation id = ResourceLocation.fromNamespaceAndPath("foundations_soil_test", "genetics");
+        Identifier id = Identifier.fromNamespaceAndPath("foundations_soil_test", "genetics");
         SoilIntegrationRegistry.register(id, "Genetics Test", java.util.Set.of("crop_registration", "soil_query"));
         SoilIntegrationRegistry.record(id, "crops_registered");
         SoilIntegrationRegistry.record(id, "crops_registered");

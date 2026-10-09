@@ -12,7 +12,7 @@ import com.foundations.soil.crop.CropFamily;
 import com.foundations.soil.integration.SoilIntegrationRegistry;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 
 /** Stable public entry point for Foundations Soil integrations. */
@@ -50,7 +50,7 @@ public final class FoundationsSoilApi {
     public static Optional<SoilResponse> evaluateTraits(ServerLevel level, BlockPos soilPos, String cropId,
                                                        SoilTraits traits, double tfcHydration) {
         requireServerRead(level, soilPos);
-        ResourceLocation id = ResourceLocation.tryParse(cropId);
+        Identifier id = Identifier.tryParse(cropId);
         if (id == null) throw new IllegalArgumentException("Invalid crop id");
         return com.foundations.soil.soil.SoilManager.peek(level, soilPos).map(cell -> SoilResponse.evaluate(cell.profile(),
             cell.texture(), com.foundations.soil.crop.CropRegistry.resolve(id), traits, tfcHydration, cell.continuousPressure()));
@@ -88,13 +88,13 @@ public final class FoundationsSoilApi {
     }
 
     public static SoilSnapshot recordCropPlanted(ServerLevel level, BlockPos soilPos, String cropBlockId) {
-        ResourceLocation id = ResourceLocation.tryParse(cropBlockId);
+        Identifier id = Identifier.tryParse(cropBlockId);
         if (id == null) throw new IllegalArgumentException("Invalid crop id: " + cropBlockId);
         return SERVICE.recordCropPlanted(level, soilPos, id);
     }
 
     public static SoilSnapshot recordCropRemoved(ServerLevel level, BlockPos soilPos, String cropBlockId, boolean mature) {
-        ResourceLocation id = ResourceLocation.tryParse(cropBlockId);
+        Identifier id = Identifier.tryParse(cropBlockId);
         if (id == null) throw new IllegalArgumentException("Invalid crop id: " + cropBlockId);
         return SERVICE.recordCropRemoved(level, soilPos, id, mature);
     }
@@ -102,14 +102,14 @@ public final class FoundationsSoilApi {
     public static void registerCrop(String blockId, String family, double phMin, double phMax,
                                     double compactionTolerance, double drainageMinimum,
                                     double drainagePreferred, double organicMatterResponse) {
-        ResourceLocation id = ResourceLocation.tryParse(blockId);
+        Identifier id = Identifier.tryParse(blockId);
         if (id == null) throw new IllegalArgumentException("Invalid crop id: " + blockId);
         SERVICE.registerCrop(id, new CropDefinition(CropFamily.parse(family), phMin, phMax, compactionTolerance,
             drainageMinimum, drainagePreferred, organicMatterResponse));
     }
 
     public static double cropSoilResponse(ServerLevel level, BlockPos soilPos, String cropBlockId) {
-        ResourceLocation id = ResourceLocation.tryParse(cropBlockId);
+        Identifier id = Identifier.tryParse(cropBlockId);
         if (id == null) throw new IllegalArgumentException("Invalid crop id: " + cropBlockId);
         return SERVICE.cropSoilResponse(level, soilPos, id);
     }

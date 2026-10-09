@@ -8,7 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 
 public record SoilHudSnapshotPayload(
@@ -39,7 +39,7 @@ public record SoilHudSnapshotPayload(
     String lastHarvestFamily
 ) implements CustomPacketPayload {
     public static final Type<SoilHudSnapshotPayload> TYPE = new Type<>(
-        ResourceLocation.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "soil_hud_snapshot")
+        Identifier.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "soil_hud_snapshot")
     );
 
     public static final StreamCodec<RegistryFriendlyByteBuf, SoilHudSnapshotPayload> STREAM_CODEC = new StreamCodec<>() {

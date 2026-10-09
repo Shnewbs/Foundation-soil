@@ -1,9 +1,6 @@
 package com.foundations.soil.integration;
 
-import net.dries007.tfc.common.blockentities.FarmlandBlockEntity.NutrientType;
-import net.dries007.tfc.common.blockentities.IFarmland;
-import net.dries007.tfc.common.blocks.soil.FarmlandBlock;
-import net.dries007.tfc.world.chunkdata.ChunkData;
+import com.foundations.soil.integration.TfcRuntime;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
@@ -27,20 +24,20 @@ public record TfcSoilSnapshot(
 ) {
     public static TfcSoilSnapshot capture(ServerLevel level, BlockPos soilPos) {
         String soilBlock = BuiltInRegistries.BLOCK.getKey(level.getBlockState(soilPos).getBlock()).toString();
-        if (!(level.getBlockEntity(soilPos) instanceof IFarmland farmland)) {
+        Object farmland = level.getBlockEntity(soilPos);
+        if (!TfcRuntime.isFarmland(farmland)) {
             return new TfcSoilSnapshot(soilBlock, false, -1, -1, -1, 0.0, 0.0, 0.0);
         }
 
         // Mirror TFC FarmlandBlock#getHydrationTooltip: current hydration plus the
         // local seasonal min/max rainfall hydration, converted through the exact
         // same source-water and soil-multiplier calculation.
-        ChunkData data = ChunkData.get(level, soilPos);
-        int minRainfallHydration = (int) data.getMinRainfallHydration(soilPos);
-        int maxRainfallHydration = (int) data.getMaxRainfallHydration(soilPos);
+        int minRainfallHydration = (int) TfcRuntime.rainfallHydration(level, soilPos, true);
+        int maxRainfallHydration = (int) TfcRuntime.rainfallHydration(level, soilPos, false);
 
-        int hydration = clampHydration(FarmlandBlock.getInstantHydration(level, soilPos));
-        int minHydration = clampHydration(FarmlandBlock.getInstantHydrationFromRainHydration(level, soilPos, minRainfallHydration));
-        int maxHydration = clampHydration(FarmlandBlock.getInstantHydrationFromRainHydration(level, soilPos, maxRainfallHydration));
+        int hydration = clampHydration(TfcRuntime.hydration(level, soilPos));
+        int minHydration = clampHydration(TfcRuntime.rainHydration(level, soilPos, minRainfallHydration));
+        int maxHydration = clampHydration(TfcRuntime.rainHydration(level, soilPos, maxRainfallHydration));
 
         return new TfcSoilSnapshot(
             soilBlock,
@@ -48,9 +45,9 @@ public record TfcSoilSnapshot(
             hydration,
             minHydration,
             maxHydration,
-            unit(farmland.getNutrient(NutrientType.NITROGEN)),
-            unit(farmland.getNutrient(NutrientType.PHOSPHOROUS)),
-            unit(farmland.getNutrient(NutrientType.POTASSIUM))
+            unit(TfcRuntime.nutrient(farmland, 0)),
+            unit(TfcRuntime.nutrient(farmland, 1)),
+            unit(TfcRuntime.nutrient(farmland, 2))
         );
     }
 

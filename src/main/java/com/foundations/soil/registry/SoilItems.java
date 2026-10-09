@@ -19,15 +19,15 @@ public final class SoilItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(FoundationsSoil.MOD_ID);
     public static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, FoundationsSoil.MOD_ID);
 
-    public static final DeferredItem<Item> EMPTY_AMENDMENT_BAG = ITEMS.registerSimpleItem("empty_amendment_bag", new Item.Properties());
-    public static final DeferredItem<Item> BIOCHAR = ITEMS.registerSimpleItem("biochar", new Item.Properties());
-    public static final DeferredItem<Item> MANURE = ITEMS.registerSimpleItem("manure", new Item.Properties());
+    public static final DeferredItem<Item> EMPTY_AMENDMENT_BAG = ITEMS.registerSimpleItem("empty_amendment_bag", Item.Properties::new);
+    public static final DeferredItem<Item> BIOCHAR = ITEMS.registerSimpleItem("biochar", Item.Properties::new);
+    public static final DeferredItem<Item> MANURE = ITEMS.registerSimpleItem("manure", Item.Properties::new);
 
     public static final DeferredItem<FieldGuideItem> FIELD_GUIDE = ITEMS.registerItem("field_guide", FieldGuideItem::new,
-        new Item.Properties().stacksTo(1));
+        () -> new Item.Properties().stacksTo(1));
 
     public static final DeferredItem<SoilProbeItem> SOIL_PROBE = ITEMS.registerItem("soil_probe", SoilProbeItem::new,
-        new Item.Properties().durability(256));
+        () -> new Item.Properties().durability(256));
 
     public static final DeferredItem<AmendmentBagItem> LIME_BAG = bag("lime_amendment_bag", "lime");
     public static final DeferredItem<AmendmentBagItem> SULFUR_BAG = bag("sulfur_amendment_bag", "sulfur");
@@ -61,7 +61,7 @@ public final class SoilItems {
 
     private static DeferredItem<AmendmentBagItem> bag(String name, String amendmentId) {
         return ITEMS.registerItem(name, props -> new AmendmentBagItem(props, amendmentId),
-            new Item.Properties().durability(AmendmentBagItem.MAX_APPLICATIONS));
+            () -> new Item.Properties().durability(AmendmentBagItem.MAX_APPLICATIONS));
     }
 
     public static void register(IEventBus bus) {

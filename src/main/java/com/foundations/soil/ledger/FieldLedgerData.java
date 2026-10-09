@@ -12,7 +12,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.saveddata.SavedData;
 
 /** Global per-server player Field Ledger data, stored in the Overworld data storage. */
-public final class FieldLedgerData extends SavedData {
+public final class FieldLedgerData extends com.foundations.soil.storage.SoilSavedData {
     public static final String DATA_NAME = "foundations_soil_field_ledger";
     public static final int SCHEMA_VERSION = 5;
 
@@ -32,18 +32,18 @@ public final class FieldLedgerData extends SavedData {
     public int playerCount() { return ledgers.size(); }
 
     public static FieldLedgerData load(CompoundTag root, HolderLookup.Provider registries) {
-        int schema = root.contains("schema", Tag.TAG_INT) ? root.getInt("schema") : 1;
+        int schema = com.foundations.soil.storage.NbtAccess.contains(root, "schema", Tag.TAG_INT) ? root.getInt("schema").orElse(0) : 1;
         if (schema > SCHEMA_VERSION) {
             throw new IllegalStateException("Foundations Field Ledger schema " + schema + " is newer than supported schema " + SCHEMA_VERSION);
         }
         FieldLedgerData data = new FieldLedgerData();
         ListTag players = com.foundations.soil.storage.SavedTagChecks.compounds(root, "players", true);
         for (int i = 0; i < players.size(); i++) {
-            CompoundTag player = players.getCompound(i);
+            CompoundTag player = players.getCompound(i).orElseThrow(() -> new IllegalStateException("Expected saved compound"));
             final UUID id;
-            try { id = UUID.fromString(player.getString("uuid")); }
+            try { id = UUID.fromString(player.getString("uuid").orElse("")); }
             catch (IllegalArgumentException ex) { throw new IllegalStateException("Malformed Field Ledger owner; refusing to discard saved data", ex); }
-            PlayerFieldLedger ledger = PlayerFieldLedger.load(player.getCompound("ledger"));
+            PlayerFieldLedger ledger = PlayerFieldLedger.load(player.getCompound("ledger").orElseThrow(() -> new IllegalStateException("Expected saved compound")));
             if (data.ledgers.putIfAbsent(id, ledger) != null) throw new IllegalStateException("Duplicate Field Ledger owner " + id);
         }
         if (schema < SCHEMA_VERSION) data.setDirty();

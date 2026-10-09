@@ -10,7 +10,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.neoforged.fml.ModList;
 
 /**
@@ -18,7 +18,7 @@ import net.neoforged.fml.ModList;
  * This keeps standalone source builds simple while exposing stable services when Framework is present.
  */
 public final class FrameworkSoilBridge {
-    private static final ResourceLocation MODULE_ID = ResourceLocation.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "soil");
+    private static final Identifier MODULE_ID = Identifier.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "soil");
     private static volatile Status status = Status.NOT_STARTED;
     private static volatile String detail = "Not started";
     private static final Map<String, Boolean> SERVICES = new LinkedHashMap<>();
@@ -86,7 +86,7 @@ public final class FrameworkSoilBridge {
                                            Class<?> serviceType, Object service) {
         SERVICES.put(path, false);
         try {
-            ResourceLocation resourceId = ResourceLocation.fromNamespaceAndPath(FoundationsSoil.MOD_ID, path);
+            Identifier resourceId = Identifier.fromNamespaceAndPath(FoundationsSoil.MOD_ID, path);
             Object serviceFoundationId = foundationId(FoundationsSoil.MOD_ID, path);
             Object key = createServiceKey(resourceId, serviceFoundationId, serviceType);
             if (key == null) throw new IllegalStateException("No compatible ServiceKey factory was found");
@@ -116,7 +116,7 @@ public final class FrameworkSoilBridge {
         }
     }
 
-    private static Object createServiceKey(ResourceLocation resourceId, Object foundationId, Class<?> serviceType) throws Exception {
+    private static Object createServiceKey(Identifier resourceId, Object foundationId, Class<?> serviceType) throws Exception {
         Class<?> keyClass = Class.forName("com.foundations.framework.api.service.ServiceKey");
         Object[][] candidates = new Object[][]{
             {resourceId, serviceType},

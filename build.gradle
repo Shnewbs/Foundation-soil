@@ -1,7 +1,7 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.147'
+    id 'net.neoforged.moddev' version '2.0.148'
     id 'idea'
 }
 
@@ -11,30 +11,27 @@ base { archivesName = "${mod_id}-${minecraft_version}" }
 java.toolchain.languageVersion = JavaLanguageVersion.of(Integer.parseInt(project.java_version))
 java.withSourcesJar()
 
-// Default tests exercise model/persistence code without claiming a successful game launch.
-// -PmodRuntimeTests=true retains NeoForge's full mod-loading test environment.
+// The native addon can be compiled without loading TFC. Runtime NEVER substitutes for it.
 def modRuntimeTests = providers.gradleProperty('modRuntimeTests').map { it.toBoolean() }.getOrElse(false)
-if (modRuntimeTests && !file("libs/${project.framework_jar}").isFile()) {
-    throw new GradleException("Full mod-runtime tests require the genuine Framework dependency at libs/${project.framework_jar}. No stub or optional-dependency fallback is used.")
+def requestedLaunch = gradle.startParameter.taskNames.any { it.tokenize(':').last() in ['runClient', 'runServer'] }
+def nativeRuntime = modRuntimeTests || requestedLaunch || providers.gradleProperty('nativeRuntime').map { it.toBoolean() }.getOrElse(false)
+if (nativeRuntime) {
+    apply from: 'tools/native-runtime.gradle'
+    verifyNativeRuntimeJar(file("libs/${project.tfc_jar}"), 'tfc', project.minecraft_version)
+    verifyNativeRuntimeJar(file("libs/${project.framework_jar}"), 'foundations_framework', project.minecraft_version)
 }
 
 repositories {
-    maven {
-        url = 'https://www.cursemaven.com'
-        content { includeGroup 'curse.maven' }
-    }
+    mavenCentral()
     maven {
         url = 'https://maven.blamejared.com'
-        content { includeGroup 'vazkii.patchouli' }
+        content { includeGroup 'vazkii.patchouli'; includeGroup 'mezz.jei'; includeGroup 'net.mezzdev.config' }
     }
 }
 
 neoForge {
     version = project.neo_version
-    parchment {
-        mappingsVersion = project.parchment_mappings_version
-        minecraftVersion = project.parchment_minecraft_version
-    }
+    // 26.1.2 is unobfuscated. No 1.21.1 Parchment coordinates or mappings are applied.
     runs {
         client { client() }
         server { server(); programArgument '--nogui' }
@@ -49,18 +46,21 @@ neoForge {
 configurations { runtimeClasspath.extendsFrom localRuntime }
 
 dependencies {
-    implementation "curse.maven:terrafirmacraft-302973:${tfc_file}"
-    localRuntime 'vazkii.patchouli:Patchouli:1.21.1-92-NEOFORGE'
-    testRuntimeOnly 'vazkii.patchouli:Patchouli:1.21.1-92-NEOFORGE'
-    def frameworkJar = file("libs/${project.framework_jar}")
-    if (frameworkJar.exists()) {
-        compileOnly files(frameworkJar)
-        localRuntime files(frameworkJar)
-        testImplementation files(frameworkJar)
+    // Loaded only for explicitly requested native runtime validation. Never use old 1.21.1 artifacts.
+    if (nativeRuntime) {
+        localRuntime files("libs/${project.tfc_jar}", "libs/${project.framework_jar}")
+        localRuntime "vazkii.patchouli:patchouli-neoforge:${patchouli_version}"
+        localRuntime "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
+        if (modRuntimeTests) {
+            testRuntimeOnly files("libs/${project.tfc_jar}", "libs/${project.framework_jar}")
+            testRuntimeOnly "vazkii.patchouli:patchouli-neoforge:${patchouli_version}"
+            testRuntimeOnly "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
+        }
     }
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testImplementation 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.ow2.asm:asm-tree:9.8'
 }
 
 if (!modRuntimeTests) {
@@ -68,7 +68,10 @@ if (!modRuntimeTests) {
     sourceSets.test.runtimeClasspath += sourceSets.main.compileClasspath
 }
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        if (modRuntimeTests) excludeTags 'model-only'
+        else excludeTags 'tfc-runtime'
+    }
     systemProperty 'foundations.soil.testMode', modRuntimeTests ? 'mod-runtime' : 'model-only'
     testLogging { events 'failed', 'skipped'; exceptionFormat = 'full' }
 }
@@ -93,22 +96,23 @@ def generateModMetadata = tasks.register('generateModMetadata', ProcessResources
 sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
 
-tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    // String-target Mixins bind to genuine native TFC at runtime. No synthetic target classes.
+    options.compilerArgs.add('-proc:none')
+}
 tasks.withType(AbstractArchiveTask).configureEach {
     preserveFileTimestamps = false
     reproducibleFileOrder = true
 }
 
-// This benchmark exercises model/storage code, not a running Minecraft server.
 tasks.register('soilScaleBenchmark', JavaExec) {
     group = 'verification'
-    description = 'Model/storage microbenchmark; not a live-server TPS test.'
+    description = 'Native model/storage microbenchmark; not a live-server TPS test.'
     dependsOn tasks.named('testClasses')
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'com.foundations.soil.SoilScaleBenchmark'
     maxHeapSize = '1500m'
     args layout.buildDirectory.file('reports/soil-scale-benchmark.json').get().asFile.absolutePath
-    if (modRuntimeTests) {
-        enabled = false
-    }
+    enabled = !modRuntimeTests
 }

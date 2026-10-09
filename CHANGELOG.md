@@ -1,3 +1,11 @@
+# 0.1.0-beta-port.1 — Minecraft 26.1.2
+
+Migrated the full beta source to native Minecraft 26.1.2 / NeoForge 26.1.2.114 / Java 25: persistence codecs, identifiers, screen/input APIs, item/fluid definitions and transactions, plus a mandatory TFC runtime boundary. All main sources compile and 74 native model tests pass; 1k/10k/50k compressed round trips preserve every cell. Three TFC-dependent checks and all actual game/runtime acceptance remain unexecuted. No old dependency binary, target stub, or vanilla fallback is used.
+
+See [native validation](docs/ports/26.1.2/VALIDATION.md) for evidence and blockers. Earlier beta records below refer to 1.21.1.
+
+---
+
 # 0.1.0-beta - 2026-10-08 Pacific
 
 Combined R7/R8, physical-soil, Laboratory, integration and hardening implementations. Added full Field Guide scrolling and GUI edits; persistent texture and root-zone physics; craftable comparison Laboratory and bounded trends; maturity/picking fixes and configurable TFC yield-delta response; API contract 3; protocol 8 request bounds and replay controls; strict persistence and an unreadable-save replacement guard. Repaired Java/Parchment build properties, added reproducible source/binary packaging, 70 automated tests and 1k/10k/50k model/storage benchmarks.

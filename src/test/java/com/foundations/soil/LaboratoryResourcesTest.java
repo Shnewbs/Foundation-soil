@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
+@org.junit.jupiter.api.Tag("tfc-runtime")
 class LaboratoryResourcesTest {
     @Test void laboratoryHasRecipeLootModelsAndPinnedTfcIngredients() throws Exception {
         for(String path:new String[]{"/assets/foundations_soil/blockstates/soil_laboratory.json",

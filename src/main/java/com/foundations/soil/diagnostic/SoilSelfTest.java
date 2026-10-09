@@ -19,7 +19,7 @@ import com.foundations.soil.soil.SoilProfileRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
-import net.dries007.tfc.util.calendar.Calendars;
+import com.foundations.soil.integration.TfcRuntime;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.ModList;
 
@@ -31,7 +31,7 @@ public final class SoilSelfTest {
         List<Check> checks = new ArrayList<>();
 
         check(checks, "Storage", () -> {
-            int cells = SoilManager.loadedCellCount(player.serverLevel());
+            int cells = SoilManager.loadedCellCount(player.level());
             if (cells < 0) throw new IllegalStateException("negative cell count");
             return cells + " persistent cell(s)";
         });
@@ -50,7 +50,7 @@ public final class SoilSelfTest {
 
         check(checks, "TFC Calendar", () -> {
             if (!ModList.get().isLoaded("tfc")) throw new IllegalStateException("TFC not loaded");
-            return "day=" + Calendars.SERVER.getTotalCalendarDays();
+            return "day=" + TfcRuntime.days();
         });
 
         check(checks, "Definitions", () -> {
@@ -138,7 +138,7 @@ public final class SoilSelfTest {
         });
 
         check(checks, "Server Authority", () -> {
-            if (!player.serverLevel().getServer().isSameThread()) throw new IllegalStateException("not on server thread");
+            if (!player.level().getServer().isSameThread()) throw new IllegalStateException("not on server thread");
             return "authoritative thread OK";
         });
 

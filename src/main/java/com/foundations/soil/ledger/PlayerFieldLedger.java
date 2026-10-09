@@ -75,17 +75,17 @@ public final class PlayerFieldLedger {
         PlayerFieldLedger ledger = new PlayerFieldLedger();
         ListTag entries = com.foundations.soil.storage.SavedTagChecks.compounds(tag, "entries", true);
         for (int i = 0; i < entries.size(); i++) {
-            FieldLedgerEntry entry = FieldLedgerEntry.load(entries.getCompound(i));
+            FieldLedgerEntry entry = FieldLedgerEntry.load(entries.getCompound(i).orElseThrow(() -> new IllegalStateException("Expected saved compound")));
             if (ledger.entries.putIfAbsent(entry.key(), entry) != null) throw new IllegalStateException("Duplicate saved ledger cell");
         }
         ListTag fields = com.foundations.soil.storage.SavedTagChecks.compounds(tag, "fields", false);
         int maxId = 0;
         for (int i = 0; i < fields.size(); i++) {
-            FieldLedgerField field = FieldLedgerField.load(fields.getCompound(i));
+            FieldLedgerField field = FieldLedgerField.load(fields.getCompound(i).orElseThrow(() -> new IllegalStateException("Expected saved compound")));
             if (field.id() <= 0 || ledger.fields.putIfAbsent(field.id(), field) != null) throw new IllegalStateException("Invalid or duplicate saved field ID");
             maxId = Math.max(maxId, field.id());
         }
-        ledger.nextFieldId = maxId == Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max(maxId + 1, Math.max(1, tag.getInt("next_field_id")));
+        ledger.nextFieldId = maxId == Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max(maxId + 1, Math.max(1, tag.getInt("next_field_id").orElse(0)));
         // Clear orphaned memberships rather than silently pointing at a deleted/nonexistent field.
         for (FieldLedgerEntry entry : ledger.entries.values()) {
             if (entry.fieldId() != 0 && !ledger.fields.containsKey(entry.fieldId())) entry.setFieldId(0);

@@ -107,17 +107,17 @@ public final class SoilFluids {
             this.source = FLUIDS.register(name, () -> new BaseFlowingFluid.Source(properties));
             this.flowing = FLUIDS.register("flowing_" + name, () -> new BaseFlowingFluid.Flowing(properties));
 
-            this.block = BLOCKS.register(name, () -> new LiquidBlock(source.get(), BlockBehaviour.Properties.of()
+            this.block = BLOCKS.registerBlock(name, props -> new LiquidBlock(source.get(), props), () -> BlockBehaviour.Properties.of()
                 .replaceable()
-                .noCollission()
+                .noCollision()
                 .noLootTable()
                 .strength(100.0F)
-                .liquid()));
+                .liquid());
             properties.block(block);
 
             this.bucket = ITEMS.registerItem(name + "_bucket",
                 props -> new BucketItem(source.get(), props.craftRemainder(Items.BUCKET).stacksTo(1)),
-                new Item.Properties().stacksTo(1));
+                () -> new Item.Properties().stacksTo(1));
             properties.bucket(bucket);
         }
 

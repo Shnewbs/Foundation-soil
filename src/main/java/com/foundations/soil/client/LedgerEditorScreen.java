@@ -8,7 +8,7 @@ import com.foundations.soil.network.FieldGuideDataPayload.FieldView;
 import com.foundations.soil.network.LedgerEditPayload;
 import com.foundations.soil.network.LedgerEditReply;
 import java.util.UUID;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ConfirmScreen;
@@ -88,7 +88,7 @@ public final class LedgerEditorScreen extends Screen {
         }
         String key = cell == null ? "" : FieldLedgerEntry.key(cell.dimension(), cell.cellX(), cell.cellZ());
         pending = UUID.randomUUID(); waitingTicks = 0; status = "Waiting for server confirmation..."; lock(true);
-        PacketDistributor.sendToServer(new LedgerEditPayload(pending,
+        net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new LedgerEditPayload(pending,
             new LedgerMutation(action, key, id, name.getValue(), note.getValue(), favorite),
             parent.data().fieldOffset(), parent.data().cellOffset()));
     }
@@ -109,20 +109,20 @@ public final class LedgerEditorScreen extends Screen {
             status = "No reply received. Reopen the guide to verify before retrying.";
         }
     }
-    @Override protected void renderBlurredBackground(float partialTick) {}
-    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+    @Override protected void extractBlurredBackground(GuiGraphicsExtractor graphics) {}
+    @Override public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
         g.fill(0, 0, width, height, 0xAA17130F);
         g.fill(left, top, left + panelWidth, top + 240, 0xFFF4E8BF);
-        g.drawString(font, title, left + 12, top + 10, 0xFF3B2B1D, false);
+        g.text(font, title, left + 12, top + 10, 0xFF3B2B1D, false);
         String label = creating || cell == null ? "Field name" : "Cell " + cell.cellX() + ", " + cell.cellZ();
-        g.drawString(font, label, left + 12, top + 27, 0xFF3B2B1D, false);
-        g.drawString(font, "Note (up to 256 characters)", left + 12, top + 67, 0xFF3B2B1D, false);
+        g.text(font, label, left + 12, top + 27, 0xFF3B2B1D, false);
+        g.text(font, "Note (up to 256 characters)", left + 12, top + 67, 0xFF3B2B1D, false);
         if (!creating && cell != null) {
             String assigned = parent.data().fields().stream().filter(f -> f.id() == fieldId()).map(FieldView::name).findFirst().orElse("0 = unassigned; other pages accept an ID");
-            g.drawString(font, font.plainSubstrByWidth("Field: " + assigned, panelWidth - 24), left + 12, top + 135, 0xFF3B2B1D, false);
+            g.text(font, font.plainSubstrByWidth("Field: " + assigned, panelWidth - 24), left + 12, top + 135, 0xFF3B2B1D, false);
         }
-        if (!status.isBlank()) g.drawString(font, font.plainSubstrByWidth(status, panelWidth - 24), left + 12, top + 171, 0xFF9B472B, false);
-        super.render(g, mouseX, mouseY, partialTick);
+        if (!status.isBlank()) g.text(font, font.plainSubstrByWidth(status, panelWidth - 24), left + 12, top + 171, 0xFF9B472B, false);
+        super.extractRenderState(g, mouseX, mouseY, partialTick);
     }
     @Override public boolean isPauseScreen() { return false; }
     @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }

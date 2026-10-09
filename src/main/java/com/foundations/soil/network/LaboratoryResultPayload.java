@@ -7,7 +7,7 @@ import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record LaboratoryResultPayload(UUID requestId, List<String> first, List<String> second) implements CustomPacketPayload {
     public static final int MAX_LINES = 96;
@@ -17,7 +17,7 @@ public record LaboratoryResultPayload(UUID requestId, List<String> first, List<S
         for (String line : first) if (line.length() > 256) throw new IllegalArgumentException("Laboratory line too long");
         for (String line : second) if (line.length() > 256) throw new IllegalArgumentException("Laboratory line too long");
     }
-    public static final Type<LaboratoryResultPayload> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "laboratory_result"));
+    public static final Type<LaboratoryResultPayload> TYPE = new Type<>(Identifier.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "laboratory_result"));
     public static final StreamCodec<RegistryFriendlyByteBuf, LaboratoryResultPayload> STREAM_CODEC = new StreamCodec<>() {
         public LaboratoryResultPayload decode(RegistryFriendlyByteBuf b) { return new LaboratoryResultPayload(b.readUUID(), read(b), read(b)); }
         public void encode(RegistryFriendlyByteBuf b, LaboratoryResultPayload p) { b.writeUUID(p.requestId); write(b, p.first); write(b, p.second); }

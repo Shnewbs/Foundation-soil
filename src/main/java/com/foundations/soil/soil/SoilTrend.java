@@ -48,10 +48,10 @@ public final class SoilTrend {
         long previous = -1;
         for (Tag value : list) {
             CompoundTag tag = (CompoundTag) value;
-            long day = tag.getLong("day");
+            long day = tag.getLong("day").orElse(0L);
             if (day <= previous) throw new IllegalStateException("Unordered soil trend history");
-            record(day, new SoilProfile(tag.getDouble("om"), tag.getDouble("ph"), tag.getDouble("dr"),
-                tag.getDouble("cp"), tag.getDouble("st"), tag.getDouble("bio"), tag.getDouble("sal")), tag.getDouble("pressure"));
+            record(day, new SoilProfile(tag.getDouble("om").orElse(0.0), tag.getDouble("ph").orElse(0.0), tag.getDouble("dr").orElse(0.0),
+                tag.getDouble("cp").orElse(0.0), tag.getDouble("st").orElse(0.0), tag.getDouble("bio").orElse(0.0), tag.getDouble("sal").orElse(0.0)), tag.getDouble("pressure").orElse(0.0));
             previous = day;
         }
     }

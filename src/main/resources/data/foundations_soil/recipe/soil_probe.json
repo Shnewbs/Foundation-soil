@@ -7,12 +7,8 @@
     " L "
   ],
   "key": {
-    "C": {
-      "tag": "c:ingots/copper"
-    },
-    "L": {
-      "tag": "tfc:lumber"
-    }
+    "C": "#c:ingots/copper",
+    "L": "#tfc:lumber"
   },
   "result": {
     "count": 1,

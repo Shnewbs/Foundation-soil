@@ -1,3 +1,11 @@
+# Native 26.1.2 storage and UI
+
+The Field Guide/Laboratory use native screen extraction and input events. Saved records use namespaced SavedDataType codecs; explicit legacy-file imports preserve original files and reject ambiguity. Payload schema 5 and Soil schema/model 4/4 are unchanged. GUI runtime and whole-world migration testing remain open.
+
+See [native validation](docs/ports/26.1.2/VALIDATION.md) for evidence and blockers. Earlier beta records below refer to 1.21.1.
+
+---
+
 # Beta Field Guide and Laboratory workflow
 
 In 0.1.0-beta, use **New field** to create a plot. Select a discovered cell and **Edit** to assign its field, note and favorite. Select a field and Edit to rename it or change notes/favorites. Deletion requires confirmation and preserves discovered cells and their notes. Every edit is applied to the authenticated player's ledger and displayed only after server acknowledgement.

@@ -12,7 +12,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.saveddata.SavedData;
 
-public final class SoilWorldData extends SavedData {
+public final class SoilWorldData extends com.foundations.soil.storage.SoilSavedData {
     public static final String DATA_NAME = "foundations_soil_cells";
     private final Map<Long, SoilCell> cells = new HashMap<>();
 
@@ -24,15 +24,15 @@ public final class SoilWorldData extends SavedData {
     public long[] packedKeysSnapshot() { return cells.keySet().stream().mapToLong(Long::longValue).toArray(); }
 
     public static SoilWorldData load(CompoundTag root, HolderLookup.Provider registries) {
-        int schema = root.contains("schema", Tag.TAG_INT) ? root.getInt("schema") : 1;
-        int model = root.contains("model", Tag.TAG_INT) ? root.getInt("model") : 1;
+        int schema = com.foundations.soil.storage.NbtAccess.contains(root, "schema", Tag.TAG_INT) ? root.getInt("schema").orElse(0) : 1;
+        int model = com.foundations.soil.storage.NbtAccess.contains(root, "model", Tag.TAG_INT) ? root.getInt("model").orElse(0) : 1;
         if (schema > SoilCell.SCHEMA_VERSION) throw new IllegalStateException("Foundations Soil save schema " + schema + " is newer than supported schema " + SoilCell.SCHEMA_VERSION);
         if (model > SoilCell.MODEL_VERSION) throw new IllegalStateException("Foundations Soil model " + model + " is newer than supported model " + SoilCell.MODEL_VERSION);
 
         SoilWorldData data = new SoilWorldData();
         ListTag list = com.foundations.soil.storage.SavedTagChecks.compounds(root, "cells", true);
         for (int i = 0; i < list.size(); i++) {
-            SoilCell cell = SoilCell.load(list.getCompound(i));
+            SoilCell cell = SoilCell.load(list.getCompound(i).orElseThrow(() -> new IllegalStateException("Expected saved compound")));
             if (data.cells.putIfAbsent(new SoilCellKey(cell.cellX(), cell.cellZ()).packed(), cell) != null)
                 throw new IllegalStateException("Duplicate persisted Soil Cell; refusing to overwrite history");
         }

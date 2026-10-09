@@ -1,0 +1,41 @@
+// Early dependency guard for developer launches; the real loader remains authoritative.
+// This checks declared mod IDs and numeric Minecraft ranges, not whether gameplay works.
+import java.util.zip.ZipFile
+
+ext.verifyNativeRuntimeJar = { File jar, String modId, String minecraft ->
+    if (!jar.isFile()) throw new GradleException("Native runtime requires genuine ${modId} at ${jar}. " +
+        "The 26.1.2 port compiles independently; a model-test pass does not mean the required mods are installed.")
+    new ZipFile(jar).withCloseable { zip ->
+        def entry = zip.getEntry('META-INF/neoforge.mods.toml')
+        if (entry == null || entry.size > 131072) throw new GradleException("Missing/oversized NeoForge metadata in ${jar}")
+        String text = zip.getInputStream(entry).getText('UTF-8')
+        def sections = text.split(/(?m)(?=^\s*\[\[)/)
+        def identifies = sections.any { it.stripLeading().startsWith('[[mods]]') && (it =~ /(?m)^\s*modId\s*=\s*["']([^"']+)["']/).find { match -> match[1] == modId } }
+        if (!identifies) throw new GradleException("${jar} does not declare expected mod ID ${modId}")
+        def mc = sections.find { (it =~ /(?m)^\s*modId\s*=\s*["']minecraft["']/).find() && it.contains('dependencies.') }
+        def rangeMatch = mc == null ? null : (mc =~ /(?m)^\s*versionRange\s*=\s*["']([^"']+)["']/)
+        if (rangeMatch == null || !rangeMatch.find()) throw new GradleException("${jar} lacks a verifiable Minecraft dependency range")
+        String range = rangeMatch.group(1).trim()
+        def compare = { String first, String second ->
+            if (!(first ==~ /[0-9]+(\.[0-9]+)*/) || !(second ==~ /[0-9]+(\.[0-9]+)*/))
+                throw new GradleException("Unrecognized native Minecraft version: ${first} / ${second}")
+            def a = first.tokenize('.').collect { it.toInteger() }; def b = second.tokenize('.').collect { it.toInteger() }
+            for (int i=0; i<Math.max(a.size(),b.size()); i++) {
+                int difference = (i<a.size()?a[i]:0) <=> (i<b.size()?b[i]:0)
+                if (difference != 0) return difference
+            }
+            return 0
+        }
+        boolean matches = false
+        def exact = range =~ /^\[([0-9.]+)\]$/
+        def interval = range =~ /^([\[(])([0-9.]*),\s*([0-9.]*)([\])])$/
+        if (exact.matches()) matches = compare(minecraft, exact.group(1)) == 0
+        else if (interval.matches()) {
+            def lower = interval.group(2); def upper = interval.group(3)
+            matches = (!lower || compare(minecraft, lower) > 0 || compare(minecraft, lower) == 0 && interval.group(1) == '[') &&
+                      (!upper || compare(minecraft, upper) < 0 || compare(minecraft, upper) == 0 && interval.group(4) == ']')
+        }
+        if (!matches) throw new GradleException("${jar} declares Minecraft ${range}, not a verifiable ${minecraft} runtime. Do not rename legacy JARs.")
+        logger.lifecycle("Verified declared native dependency: ${modId} (${range}) from ${jar.name}; runtime API checks still apply.")
+    }
+}

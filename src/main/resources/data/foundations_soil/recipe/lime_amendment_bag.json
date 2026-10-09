@@ -2,33 +2,15 @@
   "type": "minecraft:crafting_shapeless",
   "category": "misc",
   "ingredients": [
-    {
-      "item": "tfc:powder/lime"
-    },
-    {
-      "item": "tfc:powder/lime"
-    },
-    {
-      "item": "tfc:powder/lime"
-    },
-    {
-      "item": "tfc:powder/lime"
-    },
-    {
-      "item": "tfc:powder/lime"
-    },
-    {
-      "item": "tfc:powder/lime"
-    },
-    {
-      "item": "tfc:powder/lime"
-    },
-    {
-      "item": "tfc:powder/lime"
-    },
-    {
-      "item": "foundations_soil:empty_amendment_bag"
-    }
+    "tfc:powder/lime",
+    "tfc:powder/lime",
+    "tfc:powder/lime",
+    "tfc:powder/lime",
+    "tfc:powder/lime",
+    "tfc:powder/lime",
+    "tfc:powder/lime",
+    "tfc:powder/lime",
+    "foundations_soil:empty_amendment_bag"
   ],
   "result": {
     "count": 1,

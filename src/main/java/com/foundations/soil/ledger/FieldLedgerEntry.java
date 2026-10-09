@@ -203,7 +203,7 @@ public final class FieldLedgerEntry {
     /** Captures a read-only TerraFirmaCraft snapshot from the exact block probed by the player. */
     public void refreshTfc(ServerLevel level, BlockPos soilPos) {
         TfcSoilSnapshot snapshot = TfcSoilSnapshot.capture(level, soilPos);
-        lastProbeDay = Math.max(0, net.dries007.tfc.util.calendar.Calendars.SERVER.getTotalCalendarDays());
+        lastProbeDay = Math.max(0, com.foundations.soil.integration.TfcRuntime.days());
         tfcSoilBlock = snapshot.soilBlock();
         tfcFarmlandDataPresent = snapshot.farmlandDataPresent();
         tfcHydration = snapshot.hydration();
@@ -281,62 +281,62 @@ public final class FieldLedgerEntry {
 
     public static FieldLedgerEntry load(CompoundTag tag) {
         FieldLedgerEntry entry = new FieldLedgerEntry(
-            tag.getString("dimension"), tag.getInt("cell_x"), tag.getInt("cell_z"), tag.getInt("sample_y"),
-            tag.getLong("first_discovered_tick")
+            tag.getString("dimension").orElse(""), tag.getInt("cell_x").orElse(0), tag.getInt("cell_z").orElse(0), tag.getInt("sample_y").orElse(0),
+            tag.getLong("first_discovered_tick").orElse(0L)
         );
-        entry.lastProbeDay = tag.contains("last_probe_day", Tag.TAG_LONG) ? tag.getLong("last_probe_day") : -1;
-        if (tag.contains("physical", Tag.TAG_COMPOUND)) {
-            CompoundTag physical = tag.getCompound("physical");
-            entry.texture = new com.foundations.soil.soil.SoilTexture(physical.getDouble("sand"), physical.getDouble("silt"), physical.getDouble("clay"));
+        entry.lastProbeDay = com.foundations.soil.storage.NbtAccess.contains(tag, "last_probe_day", Tag.TAG_LONG) ? tag.getLong("last_probe_day").orElse(0L) : -1;
+        if (com.foundations.soil.storage.NbtAccess.contains(tag, "physical", Tag.TAG_COMPOUND)) {
+            CompoundTag physical = tag.getCompound("physical").orElseThrow(() -> new IllegalStateException("Expected saved compound"));
+            entry.texture = new com.foundations.soil.soil.SoilTexture(physical.getDouble("sand").orElse(0.0), physical.getDouble("silt").orElse(0.0), physical.getDouble("clay").orElse(0.0));
         }
-        entry.trend.load(tag.getList("trend", Tag.TAG_COMPOUND));
-        entry.lastScannedTick = Math.max(0, tag.getLong("last_scanned_tick"));
-        entry.lastScannedDay = Math.max(0, tag.getLong("last_scanned_day"));
-        entry.favorite = tag.getBoolean("favorite");
-        entry.note = clean(tag.getString("note"), 256);
-        entry.fieldId = Math.max(0, tag.getInt("field_id"));
-        entry.organicMatter = tag.getDouble("organic_matter");
-        entry.pH = tag.getDouble("ph");
-        entry.drainage = tag.getDouble("drainage");
-        entry.compaction = tag.getDouble("compaction");
-        entry.structure = tag.getDouble("structure");
-        entry.biology = tag.getDouble("biology");
-        entry.salinity = tag.getDouble("salinity");
-        entry.nutrientAccess = tag.getDouble("nutrient_access");
+        entry.trend.load(com.foundations.soil.storage.SavedTagChecks.compounds(tag, "trend", false));
+        entry.lastScannedTick = Math.max(0, tag.getLong("last_scanned_tick").orElse(0L));
+        entry.lastScannedDay = Math.max(0, tag.getLong("last_scanned_day").orElse(0L));
+        entry.favorite = tag.getBoolean("favorite").orElse(false);
+        entry.note = clean(tag.getString("note").orElse(""), 256);
+        entry.fieldId = Math.max(0, tag.getInt("field_id").orElse(0));
+        entry.organicMatter = tag.getDouble("organic_matter").orElse(0.0);
+        entry.pH = tag.getDouble("ph").orElse(0.0);
+        entry.drainage = tag.getDouble("drainage").orElse(0.0);
+        entry.compaction = tag.getDouble("compaction").orElse(0.0);
+        entry.structure = tag.getDouble("structure").orElse(0.0);
+        entry.biology = tag.getDouble("biology").orElse(0.0);
+        entry.salinity = tag.getDouble("salinity").orElse(0.0);
+        entry.nutrientAccess = tag.getDouble("nutrient_access").orElse(0.0);
         for (double value : new double[]{entry.organicMatter, entry.pH, entry.drainage, entry.compaction,
                 entry.structure, entry.biology, entry.salinity, entry.nutrientAccess})
             if (!Double.isFinite(value)) throw new IllegalStateException("Non-finite saved ledger measurement");
-        entry.amendmentApplications = Math.max(0, tag.getInt("amendment_applications"));
-        entry.cropCycles = Math.max(0, tag.getInt("crop_cycles"));
-        entry.continuousCropCycles = Math.max(0, tag.getInt("continuous_crop_cycles"));
-        entry.continuousPressure = unit(tag.getDouble("continuous_pressure"));
-        entry.daysBare = Math.max(0, tag.getLong("days_bare"));
-        entry.daysCovered = Math.max(0, tag.getLong("days_covered"));
-        entry.organicReserve = unit(tag.getDouble("organic_reserve"));
-        entry.activePlantings = Math.max(0, tag.getInt("active_plantings"));
-        entry.lastHarvestFamily = clean(tag.getString("last_harvest_family"), 64);
-        entry.lastAmendmentId = clean(tag.getString("last_amendment_id"), 64);
-        entry.lastAmendmentDay = tag.contains("last_amendment_day", Tag.TAG_LONG) ? tag.getLong("last_amendment_day") : -1L;
-        entry.lastAmendmentAmount = nonNegative(tag.getDouble("last_amendment_amount"));
-        entry.lastAmendmentUnit = clean(tag.getString("last_amendment_unit"), 32);
-        entry.lastAmendmentConcentration = tag.contains("last_amendment_concentration", Tag.TAG_DOUBLE)
-            ? positiveOrOne(tag.getDouble("last_amendment_concentration")) : 1.0;
-        entry.lastAmendmentOverApplied = tag.getBoolean("last_amendment_overapplied");
-        entry.pendingAmendmentCount = Math.max(0, tag.getInt("pending_amendment_count"));
-        entry.pendingAmendmentDaysRemaining = nonNegative(tag.getDouble("pending_amendment_days_remaining"));
-        entry.recentAmendmentLoad = nonNegative(tag.getDouble("recent_amendment_load"));
-        entry.tfcSoilBlock = clean(tag.getString("tfc_soil_block"), 128);
-        entry.tfcFarmlandDataPresent = tag.getBoolean("tfc_farmland_data_present");
-        entry.tfcHydration = entry.tfcFarmlandDataPresent ? hydration(tag.getInt("tfc_hydration")) : -1;
-        entry.tfcMinHydration = entry.tfcFarmlandDataPresent && tag.contains("tfc_min_hydration", Tag.TAG_INT) ? hydration(tag.getInt("tfc_min_hydration")) : -1;
-        entry.tfcMaxHydration = entry.tfcFarmlandDataPresent && tag.contains("tfc_max_hydration", Tag.TAG_INT) ? hydration(tag.getInt("tfc_max_hydration")) : -1;
-        entry.tfcNitrogen = unit(tag.getDouble("tfc_nitrogen"));
-        entry.tfcPhosphorus = unit(tag.getDouble("tfc_phosphorus"));
-        entry.tfcPotassium = unit(tag.getDouble("tfc_potassium"));
-        if (tag.contains("recent_events", Tag.TAG_LIST)) {
-            ListTag events = tag.getList("recent_events", Tag.TAG_STRING);
+        entry.amendmentApplications = Math.max(0, tag.getInt("amendment_applications").orElse(0));
+        entry.cropCycles = Math.max(0, tag.getInt("crop_cycles").orElse(0));
+        entry.continuousCropCycles = Math.max(0, tag.getInt("continuous_crop_cycles").orElse(0));
+        entry.continuousPressure = unit(tag.getDouble("continuous_pressure").orElse(0.0));
+        entry.daysBare = Math.max(0, tag.getLong("days_bare").orElse(0L));
+        entry.daysCovered = Math.max(0, tag.getLong("days_covered").orElse(0L));
+        entry.organicReserve = unit(tag.getDouble("organic_reserve").orElse(0.0));
+        entry.activePlantings = Math.max(0, tag.getInt("active_plantings").orElse(0));
+        entry.lastHarvestFamily = clean(tag.getString("last_harvest_family").orElse(""), 64);
+        entry.lastAmendmentId = clean(tag.getString("last_amendment_id").orElse(""), 64);
+        entry.lastAmendmentDay = com.foundations.soil.storage.NbtAccess.contains(tag, "last_amendment_day", Tag.TAG_LONG) ? tag.getLong("last_amendment_day").orElse(0L) : -1L;
+        entry.lastAmendmentAmount = nonNegative(tag.getDouble("last_amendment_amount").orElse(0.0));
+        entry.lastAmendmentUnit = clean(tag.getString("last_amendment_unit").orElse(""), 32);
+        entry.lastAmendmentConcentration = com.foundations.soil.storage.NbtAccess.contains(tag, "last_amendment_concentration", Tag.TAG_DOUBLE)
+            ? positiveOrOne(tag.getDouble("last_amendment_concentration").orElse(0.0)) : 1.0;
+        entry.lastAmendmentOverApplied = tag.getBoolean("last_amendment_overapplied").orElse(false);
+        entry.pendingAmendmentCount = Math.max(0, tag.getInt("pending_amendment_count").orElse(0));
+        entry.pendingAmendmentDaysRemaining = nonNegative(tag.getDouble("pending_amendment_days_remaining").orElse(0.0));
+        entry.recentAmendmentLoad = nonNegative(tag.getDouble("recent_amendment_load").orElse(0.0));
+        entry.tfcSoilBlock = clean(tag.getString("tfc_soil_block").orElse(""), 128);
+        entry.tfcFarmlandDataPresent = tag.getBoolean("tfc_farmland_data_present").orElse(false);
+        entry.tfcHydration = entry.tfcFarmlandDataPresent ? hydration(tag.getInt("tfc_hydration").orElse(0)) : -1;
+        entry.tfcMinHydration = entry.tfcFarmlandDataPresent && com.foundations.soil.storage.NbtAccess.contains(tag, "tfc_min_hydration", Tag.TAG_INT) ? hydration(tag.getInt("tfc_min_hydration").orElse(0)) : -1;
+        entry.tfcMaxHydration = entry.tfcFarmlandDataPresent && com.foundations.soil.storage.NbtAccess.contains(tag, "tfc_max_hydration", Tag.TAG_INT) ? hydration(tag.getInt("tfc_max_hydration").orElse(0)) : -1;
+        entry.tfcNitrogen = unit(tag.getDouble("tfc_nitrogen").orElse(0.0));
+        entry.tfcPhosphorus = unit(tag.getDouble("tfc_phosphorus").orElse(0.0));
+        entry.tfcPotassium = unit(tag.getDouble("tfc_potassium").orElse(0.0));
+        if (com.foundations.soil.storage.NbtAccess.contains(tag, "recent_events", Tag.TAG_LIST)) {
+            ListTag events = com.foundations.soil.storage.NbtAccess.strings(tag, "recent_events");
             for (int i = 0; i < Math.min(SoilConfig.LEDGER_MAX_RECENT_EVENTS.get(), events.size()); i++) {
-                entry.recentEvents.add(clean(events.getString(i), 160));
+                entry.recentEvents.add(clean(events.getString(i).orElseThrow(), 160));
             }
         }
         return entry;

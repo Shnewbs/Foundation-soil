@@ -20,7 +20,7 @@ import org.slf4j.Logger;
 @Mod(FoundationsSoil.MOD_ID)
 public final class FoundationsSoil {
     public static final String MOD_ID = "foundations_soil";
-    public static final String VERSION = "0.1.0-beta";
+    public static final String VERSION = "0.1.0-beta-port.1";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public FoundationsSoil(IEventBus modBus, ModContainer container) {
@@ -39,6 +39,7 @@ public final class FoundationsSoil {
             SoilCell.MODEL_VERSION, SoilCell.SCHEMA_VERSION, SoilCellKey.CELL_SIZE, SoilCellKey.CELL_SIZE);
         LOGGER.info("[Foundations Soil] Field Ledger schema={} with TFC snapshots, amendment status/history, and field-condition summaries", com.foundations.soil.ledger.FieldLedgerData.SCHEMA_VERSION);
         event.enqueueWork(() -> {
+            com.foundations.soil.integration.TfcRuntime.bootstrap();
             AmendmentInputBridge.bootstrap();
             FrameworkSoilBridge.bootstrap();
         });

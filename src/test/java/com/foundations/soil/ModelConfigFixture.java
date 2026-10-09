@@ -12,6 +12,21 @@ public final class ModelConfigFixture implements BeforeAllCallback {
         if (!"mod-runtime".equals(System.getProperty("foundations.soil.testMode"))) loadDefaults();
     }
     public static void loadDefaults() {
+        // A real, minimal FML context is needed by native SharedConstants. It does not discover
+        // or load mods and is not a mod-launch test. Never installs a stub TFC/Framework module.
+        if (net.neoforged.fml.loading.FMLLoader.getCurrentOrNull() == null) {
+            try {
+                var ctor = net.neoforged.fml.loading.FMLLoader.class.getDeclaredConstructor(
+                    ClassLoader.class, String[].class, net.neoforged.api.distmarker.Dist.class, boolean.class, java.nio.file.Path.class);
+                ctor.setAccessible(true);
+                ctor.newInstance(ModelConfigFixture.class.getClassLoader(), new String[]{
+                    "--fml.neoForgeVersion", "26.1.2.114", "--fml.mcVersion", "26.1.2"},
+                    net.neoforged.api.distmarker.Dist.DEDICATED_SERVER, false,
+                    java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "soil-native-model-tests"));
+            } catch (ReflectiveOperationException failure) {
+                throw new IllegalStateException("Native FML model-test context changed", failure);
+            }
+        }
         CommentedConfig config = CommentedConfig.inMemory();
         SoilConfig.SPEC.correct(config);
         try {

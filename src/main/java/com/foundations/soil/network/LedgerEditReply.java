@@ -5,11 +5,11 @@ import java.util.UUID;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /** A null snapshot is an explicit rejected edit, never an optimistic client-side mutation. */
 public record LedgerEditReply(UUID requestId, String message, FieldGuideDataPayload snapshot) implements CustomPacketPayload {
-    public static final Type<LedgerEditReply> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "ledger_edit_reply"));
+    public static final Type<LedgerEditReply> TYPE = new Type<>(Identifier.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "ledger_edit_reply"));
     public static final StreamCodec<RegistryFriendlyByteBuf, LedgerEditReply> STREAM_CODEC = new StreamCodec<>() {
         public LedgerEditReply decode(RegistryFriendlyByteBuf b) {
             UUID id = b.readUUID(); String message = b.readUtf(256);

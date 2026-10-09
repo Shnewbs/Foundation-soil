@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -82,14 +82,14 @@ public final class LaboratoryScreen extends Screen {
         int f = data.fieldOffset(), c = data.cellOffset();
         if (fields) f = direction < 0 ? Math.max(0, f - 1) : f + data.fields().size();
         else c = direction < 0 ? Math.max(0, c - 1) : c + data.cells().size();
-        PacketDistributor.sendToServer(new FieldGuidePageRequest(f, c));
+        net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new FieldGuidePageRequest(f, c));
     }
     public void acceptData(FieldGuideDataPayload value) { data = value; status = "Record page refreshed. Existing comparison selections are retained."; }
     private void query() {
         if (pending != null) return;
         pending = UUID.randomUUID(); waitTicks = 0; analyze.active = false;
         status = "Requesting authoritative saved measurements...";
-        PacketDistributor.sendToServer(new LaboratoryQueryPayload(pending, position, selected[0], selected[1]));
+        net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new LaboratoryQueryPayload(pending, position, selected[0], selected[1]));
     }
     public void acceptResult(LaboratoryResultPayload value) {
         if (!value.requestId().equals(pending)) return;
@@ -100,12 +100,12 @@ public final class LaboratoryScreen extends Screen {
     @Override public void tick() {
         if (pending != null && ++waitTicks > 200) { pending = null; analyze.active = true; status = "No response. Stay within eight blocks of the Laboratory and try again."; }
     }
-    @Override public void render(GuiGraphics g, int mx, int my, float partial) {
-        renderBackground(g, mx, my, partial);
-        g.drawCenteredString(font, title, width / 2, 9, 0xFFFFFF);
+    @Override public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float partial) {
+        extractBackground(g, mx, my, partial);
+        g.centeredText(font, title, width / 2, 9, 0xFFFFFFFF);
         for (int pane = 0; pane < 2; pane++) {
             int x = left(pane), viewHeight = bottom - top;
-            g.drawString(font, font.plainSubstrByWidth(labels[pane], columnWidth), x, 71, 0xFFFFFF, false);
+            g.text(font, font.plainSubstrByWidth(labels[pane], columnWidth), x, 71, 0xFFFFFFFF, false);
             List<FormattedCharSequence> wrapped = new ArrayList<>();
             for (String line : pane == 0 ? first : second) {
                 wrapped.addAll(font.split(Component.literal(line), Math.max(20, columnWidth - 17)));
@@ -115,15 +115,15 @@ public final class LaboratoryScreen extends Screen {
             g.fill(x - 2, top - 2, x + columnWidth + 2, bottom + 2, 0xD0181B20);
             g.enableScissor(x, top, x + columnWidth - 9, bottom);
             int y = top - s.offset();
-            for (var line : wrapped) { if (y + 10 >= top && y < bottom) g.drawString(font, line, x + 2, y, 0xE6E6E6, false); y += 11; }
+            for (var line : wrapped) { if (y + 10 >= top && y < bottom) g.text(font, line, x + 2, y, 0xFFE6E6E6, false); y += 11; }
             g.disableScissor();
             if (s.maximum() > 0) {
                 g.fill(x + columnWidth - 6, top, x + columnWidth - 2, bottom, 0xFF434343);
                 g.fill(x + columnWidth - 6, top + s.thumbOffset(), x + columnWidth - 2, top + s.thumbOffset() + s.thumbHeight(), 0xFFBBBBBB);
             }
         }
-        super.render(g, mx, my, partial);
-        if (my >= height - 53 && my < height - 35) g.renderTooltip(font, Component.literal(status), mx, my);
+        super.extractRenderState(g, mx, my, partial);
+        if (my >= height - 53 && my < height - 35) g.setTooltipForNextFrame(font, Component.literal(status), mx, my);
     }
     private int hitPane(double x, double y) {
         if (y < top || y >= bottom) return -1;
@@ -134,7 +134,8 @@ public final class LaboratoryScreen extends Screen {
         int p = hitPane(x, y); if (p >= 0) { activePane = p; scroll[p].scroll(-vertical * 22); return true; }
         return super.mouseScrolled(x, y, horizontal, vertical);
     }
-    @Override public boolean mouseClicked(double x, double y, int button) {
+    @Override public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        double x = event.x(), y = event.y(); int button = event.button();
         int p = hitPane(x, y);
         if (p >= 0) {
             activePane = p;
@@ -146,19 +147,22 @@ public final class LaboratoryScreen extends Screen {
                 scroll[p].drag(relative - dragGrab); return true;
             }
         }
-        return super.mouseClicked(x, y, button);
+        return super.mouseClicked(event, doubleClick);
     }
-    @Override public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+    @Override public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dx, double dy) {
+        double x = event.x(), y = event.y(); int button = event.button();
         if (button == 0 && dragging >= 0) { scroll[dragging].drag(y - top - dragGrab); return true; }
-        return super.mouseDragged(x, y, button, dx, dy);
+        return super.mouseDragged(event, dx, dy);
     }
-    @Override public boolean mouseReleased(double x, double y, int button) { dragging = -1; return super.mouseReleased(x, y, button); }
-    @Override public boolean keyPressed(int key, int scan, int modifiers) {
+    @Override public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+        double x = event.x(), y = event.y(); int button = event.button(); dragging = -1; return super.mouseReleased(event); }
+    @Override public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        int key = event.key(), scan = event.scancode(), modifiers = event.modifiers();
         if (!(getFocused() instanceof EditBox)) {
             if (key == 266 || key == 267) { scroll[activePane].scroll((key == 266 ? -1 : 1) * (bottom - top)); return true; }
             if (key == 268 || key == 269) { scroll[activePane].set(key == 268 ? 0 : scroll[activePane].maximum()); return true; }
         }
-        return super.keyPressed(key, scan, modifiers);
+        return super.keyPressed(event);
     }
     @Override public boolean isPauseScreen() { return false; }
 }

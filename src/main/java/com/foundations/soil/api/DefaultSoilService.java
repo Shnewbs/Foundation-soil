@@ -12,7 +12,7 @@ import com.foundations.soil.soil.SoilManager;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 
 final class DefaultSoilService implements SoilService {
@@ -67,14 +67,14 @@ final class DefaultSoilService implements SoilService {
     }
 
     @Override
-    public SoilSnapshot recordCropPlanted(ServerLevel level, BlockPos soilPos, ResourceLocation cropBlockId) {
+    public SoilSnapshot recordCropPlanted(ServerLevel level, BlockPos soilPos, Identifier cropBlockId) {
         requireMutation(level, soilPos);
         if (cropBlockId == null) throw new IllegalArgumentException("cropBlockId cannot be null");
         return SoilSnapshots.from(SoilManager.recordPlanting(level, soilPos, CropRegistry.resolve(cropBlockId).family()));
     }
 
     @Override
-    public SoilSnapshot recordCropRemoved(ServerLevel level, BlockPos soilPos, ResourceLocation cropBlockId, boolean mature) {
+    public SoilSnapshot recordCropRemoved(ServerLevel level, BlockPos soilPos, Identifier cropBlockId, boolean mature) {
         requireMutation(level, soilPos);
         if (cropBlockId == null) throw new IllegalArgumentException("cropBlockId cannot be null");
         return SoilSnapshots.from(SoilManager.recordCropRemoval(level, soilPos, CropRegistry.resolve(cropBlockId).family(), mature));
@@ -98,7 +98,7 @@ final class DefaultSoilService implements SoilService {
     }
 
     @Override
-    public double cropSoilResponse(ServerLevel level, BlockPos soilPos, ResourceLocation cropBlockId) {
+    public double cropSoilResponse(ServerLevel level, BlockPos soilPos, Identifier cropBlockId) {
         requireRead(level, soilPos);
         if (cropBlockId == null) throw new IllegalArgumentException("cropBlockId cannot be null");
         var cell = SoilManager.peek(level, soilPos).orElse(null);
@@ -117,13 +117,13 @@ final class DefaultSoilService implements SoilService {
     public List<AmendmentDefinition> amendments() { return AmendmentRegistry.all(); }
 
     @Override
-    public CropDefinition crop(ResourceLocation id) {
+    public CropDefinition crop(Identifier id) {
         if (id == null) throw new IllegalArgumentException("crop id cannot be null");
         return CropRegistry.resolve(id);
     }
 
     @Override
-    public void registerCrop(ResourceLocation id, CropDefinition definition) {
+    public void registerCrop(Identifier id, CropDefinition definition) {
         CropRegistry.register(id, definition);
     }
 

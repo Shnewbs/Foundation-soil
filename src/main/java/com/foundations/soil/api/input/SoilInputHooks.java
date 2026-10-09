@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /** Generic external-delivery registry. 0.0.3a owns amendment acceptance, not transport infrastructure. */
 public final class SoilInputHooks {
@@ -22,7 +22,7 @@ public final class SoilInputHooks {
 
     private SoilInputHooks() {}
 
-    public static Registration register(ResourceLocation owner, SoilInputType type, int priority, SoilInputHandler handler) {
+    public static Registration register(Identifier owner, SoilInputType type, int priority, SoilInputHandler handler) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(type, "type");
         Objects.requireNonNull(handler, "handler");
@@ -71,7 +71,7 @@ public final class SoilInputHooks {
         return List.copyOf(result);
     }
 
-    private record Entry(ResourceLocation owner, int priority, SoilInputHandler handler) {}
+    private record Entry(Identifier owner, int priority, SoilInputHandler handler) {}
 
     @FunctionalInterface
     public interface Registration extends AutoCloseable {

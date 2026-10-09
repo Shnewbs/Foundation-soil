@@ -1,3 +1,11 @@
+# 26.1.2 integration status
+
+Contract 3 semantics are retained, but Java API signatures now use native Identifier and 26.1.2 platform classes. This is not binary compatibility with 1.21.1 addons. Real native TFC, Framework, Genetics and KubeJS adapter testing remains required.
+
+See [native validation](docs/ports/26.1.2/VALIDATION.md) for evidence and blockers. Earlier beta records below refer to 1.21.1.
+
+---
+
 # Current Soil API contract: 3
 
 0.1.0-beta adds immutable physical snapshots and abstract tolerance-based soil responses while preserving existing Java/service helpers. See [API contract 3](docs/beta/INTEGRATION_CONTRACT.md) for authoritative usage and boundaries. The earlier contract below remains historical reference, not a claim of a native KubeJS plugin or completed Genetics/Cannabis integration. Actual adapter/pack testing remains required; Soil does not store genomes or replace TFC water and nutrients.

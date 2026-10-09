@@ -8,7 +8,7 @@ import com.foundations.soil.api.input.SoilInputResult;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 
 /**
@@ -34,17 +34,17 @@ public interface SoilService {
                                                               double milliBuckets, double concentration, String source) {
         return applyRegisteredAmendmentDose(level, soilPos, amendmentId, milliBuckets, AmendmentDoseUnit.MILLIBUCKET, concentration, source);
     }
-    SoilSnapshot recordCropPlanted(ServerLevel level, BlockPos soilPos, ResourceLocation cropBlockId);
-    SoilSnapshot recordCropRemoved(ServerLevel level, BlockPos soilPos, ResourceLocation cropBlockId, boolean mature);
+    SoilSnapshot recordCropPlanted(ServerLevel level, BlockPos soilPos, Identifier cropBlockId);
+    SoilSnapshot recordCropRemoved(ServerLevel level, BlockPos soilPos, Identifier cropBlockId, boolean mature);
     SoilSnapshot recordDisturbance(ServerLevel level, BlockPos soilPos, double compactionDelta, double structureDelta);
     SoilSnapshot setStat(ServerLevel level, BlockPos soilPos, String stat, double value);
-    double cropSoilResponse(ServerLevel level, BlockPos soilPos, ResourceLocation cropBlockId);
+    double cropSoilResponse(ServerLevel level, BlockPos soilPos, Identifier cropBlockId);
 
     Optional<AmendmentDefinition> amendment(String id);
     List<AmendmentDefinition> amendments();
-    CropDefinition crop(ResourceLocation id);
+    CropDefinition crop(Identifier id);
 
-    void registerCrop(ResourceLocation id, CropDefinition definition);
+    void registerCrop(Identifier id, CropDefinition definition);
     void registerAmendment(AmendmentDefinition definition);
 
     SoilInputResult submitExternalInput(SoilExternalInput input);

@@ -20,6 +20,6 @@ public final class SoilLaboratoryBlock extends Block {
     @Override protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer && com.foundations.soil.network.SoilNetwork.permitLedgerOpen(serverPlayer))
             PacketDistributor.sendToPlayer(serverPlayer, new LaboratoryOpenPayload(pos.asLong(), FieldGuideDataPayload.from(serverPlayer)));
-        return InteractionResult.sidedSuccess(level.isClientSide());
+        return InteractionResult.SUCCESS;
     }
 }

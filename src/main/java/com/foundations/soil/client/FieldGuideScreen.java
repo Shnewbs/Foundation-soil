@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -133,7 +133,7 @@ public final class FieldGuideScreen extends Screen {
 
             if ((delta > 0 && listPage == pageCount() - 1 && offset + visible < total) || (delta < 0 && listPage == 0 && offset > 0)) {
                 int next = Math.max(0, offset + delta * Math.max(1, visible));
-                net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.foundations.soil.network.FieldGuidePageRequest(
+                net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new com.foundations.soil.network.FieldGuidePageRequest(
                     fields ? next : data.fieldOffset(), fields ? data.cellOffset() : next));
                 return;
             }
@@ -173,13 +173,13 @@ public final class FieldGuideScreen extends Screen {
      * the custom book/art layer; this mirrors the proven Economy GUI render-order fix.
      */
     @Override
-    protected void renderBlurredBackground(float partialTick) {
-        // Intentionally disabled. renderBackground() may still darken the world, but the book stays crisp.
+    protected void extractBlurredBackground(GuiGraphicsExtractor graphics) {
+        // Intentionally disabled. extractBackground() may still darken the world, but the book stays crisp.
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        if (SoilClientConfig.FIELD_GUIDE_DARKEN_BACKGROUND.get()) renderBackground(graphics, mouseX, mouseY, partialTick);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        if (SoilClientConfig.FIELD_GUIDE_DARKEN_BACKGROUND.get()) extractBackground(graphics, mouseX, mouseY, partialTick);
         drawBook(graphics);
         drawSideTabs(graphics, mouseX, mouseY);
         drawHeader(graphics);
@@ -194,7 +194,7 @@ public final class FieldGuideScreen extends Screen {
 
         editButton.visible = createButton.visible = tab == Tab.FIELDS || tab == Tab.CELLS;
         editButton.active = selectedField() != null || selectedCell() != null;
-        super.render(graphics, mouseX, mouseY, partialTick);
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         drawSearchHintNoShadow(graphics);
     }
 
@@ -211,14 +211,14 @@ public final class FieldGuideScreen extends Screen {
     private int detailTop() { return pageY + 18; }
     private int detailHeight() { return Math.max(1, bookY + bookH - 37 - detailTop()); }
     private int detailBarX() { return rightX + pageW - 19; }
-    private void scrollDetails(GuiGraphics graphics, String key, String heading, Runnable content) {
+    private void scrollDetails(GuiGraphicsExtractor graphics, String key, String heading, Runnable content) {
         detailScroll.layout(key, Math.max(detailHeight(), detailBottom - detailTop()), detailHeight());
         detailBottom = detailTop();
         graphics.enableScissor(rightX - 1, detailTop(), rightX + pageW - 21, detailTop() + detailHeight());
-        graphics.pose().pushPose();
-        graphics.pose().translate(0, -detailScroll.offset(), 0);
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(0, -detailScroll.offset());
         content.run();
-        graphics.pose().popPose(); graphics.disableScissor();
+        graphics.pose().popMatrix(); graphics.disableScissor();
         detailScroll.layout(key, Math.max(0, detailBottom - detailTop()), detailHeight());
         drawSectionTitle(graphics, rightX, pageY, font.plainSubstrByWidth(heading, pageW - 22));
         if (detailScroll.maximum() > 0) {
@@ -235,23 +235,26 @@ public final class FieldGuideScreen extends Screen {
         }
         return super.mouseScrolled(x, y, horizontal, vertical);
     }
-    @Override public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
+    @Override public boolean mouseDragged(net.minecraft.client.input.MouseButtonEvent event, double dx, double dy) {
+        double x = event.x(), y = event.y(); int button = event.button();
         if (draggingDetail && button == 0) { detailScroll.drag(y - detailTop() - dragGrab); return true; }
-        return super.mouseDragged(x, y, button, dx, dy);
+        return super.mouseDragged(event, dx, dy);
     }
-    @Override public boolean mouseReleased(double x, double y, int button) {
+    @Override public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+        double x = event.x(), y = event.y(); int button = event.button();
         if (draggingDetail && button == 0) { draggingDetail = false; return true; }
-        return super.mouseReleased(x, y, button);
+        return super.mouseReleased(event);
     }
-    @Override public boolean keyPressed(int key, int scan, int modifiers) {
+    @Override public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
+        int key = event.key(), scan = event.scancode(), modifiers = event.modifiers();
         if (search == null || !search.isFocused()) {
             if (key == 266 || key == 267) { detailScroll.scroll((key == 266 ? -1 : 1) * detailHeight() * .9); return true; }
             if (key == 268 || key == 269) { detailScroll.set(key == 268 ? 0 : detailScroll.maximum()); return true; }
         }
-        return super.keyPressed(key, scan, modifiers);
+        return super.keyPressed(event);
     }
 
-    private void drawBook(GuiGraphics g) {
+    private void drawBook(GuiGraphicsExtractor g) {
         // Drop shadow and thick leather cover.
         g.fill(bookX - 8 + 6, bookY - 8 + 7, bookX + bookW + 8 + 6, bookY + bookH + 8 + 7, SHADOW);
         g.fill(bookX - 10, bookY - 9, bookX + bookW + 10, bookY + bookH + 9, LEATHER_DARK);
@@ -296,7 +299,7 @@ public final class FieldGuideScreen extends Screen {
         g.fill(ribbonX + 10, bookY + 28, ribbonX + 15, bookY + 34, ACCENT);
     }
 
-    private void drawSideTabs(GuiGraphics g, int mouseX, int mouseY) {
+    private void drawSideTabs(GuiGraphicsExtractor g, int mouseX, int mouseY) {
         for (int i = 0; i < Tab.values().length; i++) {
             Tab candidate = Tab.values()[i];
             int y = tabY + i * 43;
@@ -311,13 +314,13 @@ public final class FieldGuideScreen extends Screen {
             g.fill(tabX + 36, y + 5, tabX + 43, y + 31, selected ? ACCENT : PAPER_EDGE);
 
             ItemStack icon = tabIcon(candidate);
-            g.renderItem(icon, tabX + 11, y + 10);
+            g.item(icon, tabX + 11, y + 10);
 
             if (hovered) {
                 int labelW = font.width(candidate.label);
                 int lx = Math.max(3, tabX - labelW - 9);
                 g.fill(lx - 3, y + 9, tabX - 3, y + 26, 0xDD2A1A11);
-                g.drawString(font, candidate.label, lx, y + 13, 0xFFF5E6B6, false);
+                g.text(font, candidate.label, lx, y + 13, 0xFFF5E6B6, false);
             }
         }
     }
@@ -331,7 +334,7 @@ public final class FieldGuideScreen extends Screen {
         };
     }
 
-    private void drawHeader(GuiGraphics g) {
+    private void drawHeader(GuiGraphicsExtractor g) {
         // Keep the book title inside the readable left-page safe zone; never center text across the gutter.
         int leftPageTitleCenter = leftX + (pageW - 12) / 2 + SoilClientConfig.FIELD_GUIDE_TITLE_X_OFFSET.get();
         drawCenteredNoShadow(g, "FOUNDATIONS FIELD GUIDE", leftPageTitleCenter,
@@ -339,14 +342,14 @@ public final class FieldGuideScreen extends Screen {
         String status = data.totalCells() + " soil cell" + (data.totalCells() == 1 ? "" : "s")
             + "  •  " + data.totalFields() + " field" + (data.totalFields() == 1 ? "" : "s");
         if (data.truncated()) status += "  •  page starts " + (data.cellOffset() + 1);
-        if (tab == Tab.GUIDE || tab == Tab.AMENDMENTS) g.drawString(font, font.plainSubstrByWidth(status, pageW - 12), rightX, bookY + bookH - 25, MUTED, false);
+        if (tab == Tab.GUIDE || tab == Tab.AMENDMENTS) g.text(font, font.plainSubstrByWidth(status, pageW - 12), rightX, bookY + bookH - 25, MUTED, false);
 
         // Tiny printed folio marks. The left mark used to sit underneath the Search EditBox and
         // was visible as stray "F/S" glyph fragments. Suppress it whenever search occupies that area.
         if (!searchAreaVisible()) {
-            g.drawString(font, "FS", leftX - 2, bookY + bookH - 24, 0xAA7B684B, false);
+            g.text(font, "FS", leftX - 2, bookY + bookH - 24, 0xAA7B684B, false);
         }
-        g.drawString(font, "B", bookX + bookW / 2 - 8, bookY + bookH - 24, 0x887B684B, false);
+        g.text(font, "B", bookX + bookW / 2 - 8, bookY + bookH - 24, 0x887B684B, false);
     }
 
     private boolean searchAreaVisible() {
@@ -354,13 +357,13 @@ public final class FieldGuideScreen extends Screen {
             && (tab == Tab.FIELDS || tab == Tab.CELLS);
     }
 
-    private void drawSearchHintNoShadow(GuiGraphics g) {
+    private void drawSearchHintNoShadow(GuiGraphicsExtractor g) {
         if (!searchAreaVisible() || !search.getValue().isEmpty() || search.isFocused()) return;
         // Draw after widgets so the placeholder cannot inherit EditBox hint shadow behavior.
-        g.drawString(font, "Search this page...", leftX + 7, bookY + bookH - 26, MUTED, false);
+        g.text(font, "Search this page...", leftX + 7, bookY + bookH - 26, MUTED, false);
     }
 
-    private void drawSearchAndPagingChrome(GuiGraphics g) {
+    private void drawSearchAndPagingChrome(GuiGraphicsExtractor g) {
         if (searchAreaVisible()) {
             int sx = leftX + 3;
             int sy = bookY + bookH - 32;
@@ -380,7 +383,7 @@ public final class FieldGuideScreen extends Screen {
         }
     }
 
-    private void drawPageArrow(GuiGraphics g, int x, int y, boolean right, boolean enabled) {
+    private void drawPageArrow(GuiGraphicsExtractor g, int x, int y, boolean right, boolean enabled) {
         int border = enabled ? LEATHER_DARK : 0xFF8E8067;
         int fill = enabled ? PAPER_ALT : 0xFFD1C4A1;
         g.fill(x, y, x + 24, y + 18, border);
@@ -388,7 +391,7 @@ public final class FieldGuideScreen extends Screen {
         drawCenteredNoShadow(g, right ? ">" : "<", x + 12, y + 5, enabled ? INK : MUTED);
     }
 
-    private void renderGuide(GuiGraphics g) {
+    private void renderGuide(GuiGraphicsExtractor g) {
         drawSectionTitle(g, leftX, pageY, "Field Notes");
         int studyHeight = bookH < 285 ? 54 : 72;
         drawSoilStudyCard(g, leftX + 4, pageY + 18, pageW - 18, studyHeight);
@@ -398,13 +401,13 @@ public final class FieldGuideScreen extends Screen {
             int y = listY + i * 14;
             boolean selected = i == guideChapter;
             if (selected) drawSelection(g, leftX - 1, y - 2, pageW - 11, 12);
-            g.drawString(font, (selected ? "› " : "  ") + GUIDE_TITLES.get(i), leftX + 2, y, selected ? GOOD : INK, false);
+            g.text(font, (selected ? "› " : "  ") + GUIDE_TITLES.get(i), leftX + 2, y, selected ? GOOD : INK, false);
         }
         int selectedChapter = Math.max(0, Math.min(guideChapter, GUIDE_TITLES.size() - 1));
         scrollDetails(g, "guide:" + selectedChapter, GUIDE_TITLES.get(selectedChapter), () -> renderGuideChapter(g, selectedChapter));
     }
 
-    private void drawSoilStudyCard(GuiGraphics g, int x, int y, int w, int h) {
+    private void drawSoilStudyCard(GuiGraphicsExtractor g, int x, int y, int w, int h) {
         g.fill(x, y, x + w, y + h, 0xFF9D8357);
         g.fill(x + 3, y + 3, x + w - 3, y + h - 3, 0xFFF9EFCF);
         int px = x + 8;
@@ -422,10 +425,10 @@ public final class FieldGuideScreen extends Screen {
         g.fill(px + pw / 3 + 2, py + ph / 2 + 10, px + pw / 3 + 11, py + ph / 2 + 12, 0xFFC7A36C);
         g.fill(px + pw - 18, py + ph / 2 + 6, px + pw - 15, py + ph / 2 + 9, 0xFF3B2B1D);
         g.fill(px + 17, py + ph / 2 + 13, px + 20, py + ph / 2 + 16, 0xFF3B2B1D);
-        g.drawString(font, "SOIL PROFILE", x + 7, y + h - 12, MUTED, false);
+        g.text(font, "SOIL PROFILE", x + 7, y + h - 12, MUTED, false);
     }
 
-    private void renderGuideChapter(GuiGraphics g, int chapter) {
+    private void renderGuideChapter(GuiGraphicsExtractor g, int chapter) {
         drawSectionTitle(g, rightX, pageY, GUIDE_TITLES.get(chapter));
         int y = pageY + 18;
         for (String paragraph : GUIDE_TEXT.get(chapter)) {
@@ -438,7 +441,7 @@ public final class FieldGuideScreen extends Screen {
         }
     }
 
-    private void renderFields(GuiGraphics g) {
+    private void renderFields(GuiGraphicsExtractor g) {
         List<FieldView> fields = filteredFields();
         drawSectionTitle(g, leftX, pageY, "My Fields");
         int listY = standardListY();
@@ -455,14 +458,14 @@ public final class FieldGuideScreen extends Screen {
             boolean selected = i == selectedIndex;
             if (selected) drawSelection(g, leftX - 1, y - 2, pageW - 11, 13);
             String star = field.favorite() ? "★ " : "";
-            g.drawString(font, font.plainSubstrByWidth(star + field.name(), pageW - 67), leftX + 2, y, selected ? GOOD : INK, false);
-            g.drawString(font, field.members() + " cells", leftX + pageW - 54, y, MUTED, false);
+            g.text(font, font.plainSubstrByWidth(star + field.name(), pageW - 67), leftX + 2, y, selected ? GOOD : INK, false);
+            g.text(font, field.members() + " cells", leftX + pageW - 54, y, MUTED, false);
         }
         FieldView selected = visible.get(Math.min(selectedIndex, visible.size() - 1));
         scrollDetails(g, "field:" + selected.id(), selected.name(), () -> renderFieldDetails(g, selected));
     }
 
-    private void renderFieldDetails(GuiGraphics g, FieldView field) {
+    private void renderFieldDetails(GuiGraphicsExtractor g, FieldView field) {
         drawSectionTitle(g, rightX, pageY, field.name());
         int y = pageY + 18;
         y = drawWrapped(g, "FIELD #" + field.id() + "  •  " + field.members() + " CELLS" + (field.favorite() ? "  ★" : ""), rightX, y, pageW - 26, MUTED) + 2;
@@ -540,7 +543,7 @@ public final class FieldGuideScreen extends Screen {
         }
     }
 
-    private void renderFieldHelp(GuiGraphics g) {
+    private void renderFieldHelp(GuiGraphicsExtractor g) {
         drawSectionTitle(g, rightX, pageY, "Field Ledger");
         int y = pageY + 18;
         y = drawWrapped(g, "The Field Ledger groups discovered 4×4 Soil Cells into named farms or plots without moving authoritative soil data out of the world save.", rightX, y, pageW - 26, INK) + 8;
@@ -548,7 +551,7 @@ public final class FieldGuideScreen extends Screen {
         detailBottom = Math.max(detailBottom, y + 14);
     }
 
-    private void renderCells(GuiGraphics g) {
+    private void renderCells(GuiGraphicsExtractor g) {
         List<CellView> cells = filteredCells();
         drawSectionTitle(g, leftX, pageY, "Discovered Soil Cells");
         int listY = standardListY();
@@ -565,20 +568,20 @@ public final class FieldGuideScreen extends Screen {
             boolean selected = i == selectedIndex;
             if (selected) drawSelection(g, leftX - 1, y - 2, pageW - 11, 13);
             String star = cell.favorite() ? "★ " : "";
-            g.drawString(font, star + "X " + cell.centerX() + "  Z " + cell.centerZ(), leftX + 2, y, selected ? GOOD : INK, false);
-            g.drawString(font, "pH " + f1(cell.pH()), leftX + pageW - 49, y, MUTED, false);
+            g.text(font, star + "X " + cell.centerX() + "  Z " + cell.centerZ(), leftX + 2, y, selected ? GOOD : INK, false);
+            g.text(font, "pH " + f1(cell.pH()), leftX + pageW - 49, y, MUTED, false);
         }
         CellView selected = visible.get(Math.min(selectedIndex, visible.size() - 1));
         scrollDetails(g, "cell:" + selected.dimension() + ":" + selected.cellX() + ":" + selected.cellZ(), "Soil Cell", () -> renderCellDetails(g, selected));
     }
 
-    private void renderEmptyCellDetails(GuiGraphics g) {
+    private void renderEmptyCellDetails(GuiGraphicsExtractor g) {
         drawSectionTitle(g, rightX, pageY, "Soil Probe");
         drawSpecimenFrame(g, rightX + 10, pageY + 23, pageW - 34, 78, new ItemStack(SoilItems.SOIL_PROBE.get()), "FIELD TOOL");
         drawWrapped(g, "Right-click TFC soil with the Soil Probe. The server creates or loads the 4×4 Soil Cell and adds a snapshot to your Field Ledger.", rightX, pageY + 111, pageW - 12, INK);
     }
 
-    private void renderCellDetails(GuiGraphics g, CellView c) {
+    private void renderCellDetails(GuiGraphicsExtractor g, CellView c) {
         drawSectionTitle(g, rightX, pageY, "Cell " + c.cellX() + ", " + c.cellZ());
         int y = pageY + 17;
         y = drawWrapped(g, shortDimension(c.dimension()), rightX, y, pageW - 26, MUTED) + 2;
@@ -649,7 +652,7 @@ public final class FieldGuideScreen extends Screen {
         detailBottom = Math.max(detailBottom, y + 14);
     }
 
-    private void renderAmendments(GuiGraphics g) {
+    private void renderAmendments(GuiGraphicsExtractor g) {
         drawSectionTitle(g, leftX, pageY, "Amendment Cabinet");
         List<AmendmentView> pages = data.amendments();
         if (pages.isEmpty()) {
@@ -670,20 +673,20 @@ public final class FieldGuideScreen extends Screen {
             int y = listY + row * 15;
             boolean selected = absolute == amendmentIndex;
             if (selected) drawSelection(g, leftX - 1, y - 2, pageW - 11, 13);
-            g.drawString(font, (selected ? "› " : "  ") + pages.get(absolute).name(), leftX + 2, y, selected ? GOOD : INK, false);
+            g.text(font, (selected ? "› " : "  ") + pages.get(absolute).name(), leftX + 2, y, selected ? GOOD : INK, false);
         }
 
         scrollDetails(g, "amendment:" + selectedPage.id(), selectedPage.name(), () -> renderAmendmentDetails(g, selectedPage));
     }
 
-    private void renderAmendmentDetails(GuiGraphics g, AmendmentView selectedPage) {
+    private void renderAmendmentDetails(GuiGraphicsExtractor g, AmendmentView selectedPage) {
         drawSectionTitle(g, rightX, pageY, selectedPage.name());
         int y = pageY + 18;
         String description = selectedPage.description().isBlank() ? "Server-defined soil amendment." : selectedPage.description();
         y = drawWrapped(g, description, rightX, y, pageW - 12, INK) + 6;
         String unit = selectedPage.doseUnit().equals("millibucket") ? "mB" : "application";
         y = drawWrapped(g, "FORM: " + selectedPage.form().toUpperCase(Locale.ROOT), rightX, y, pageW - 26, MUTED) + 2;
-        g.drawString(font, "REFERENCE: " + trimDose(selectedPage.referenceAmount()) + " " + unit
+        g.text(font, "REFERENCE: " + trimDose(selectedPage.referenceAmount()) + " " + unit
             + "  •  MAX: " + trimDose(selectedPage.maxSingleAmount()), rightX, y, MUTED, false); y += 12;
         String mixing = liquidMixing(selectedPage.id());
         if (!mixing.isBlank()) {
@@ -760,49 +763,50 @@ public final class FieldGuideScreen extends Screen {
         out.add(name + " " + sign + (percent ? Math.round(value * 1000.0) / 10.0 + "%" : f3(value)));
     }
 
-    private void drawSpecimenFrame(GuiGraphics g, int x, int y, int w, int h, ItemStack stack, String caption) {
+    private void drawSpecimenFrame(GuiGraphicsExtractor g, int x, int y, int w, int h, ItemStack stack, String caption) {
         g.fill(x, y, x + w, y + h, 0xFF9E875D);
         g.fill(x + 3, y + 3, x + w - 3, y + h - 3, 0xFFFFF3D1);
         g.fill(x + 8, y + 8, x + w - 8, y + h - 23, 0xFFE4D3A4);
         int ix = x + w / 2 - 8;
         int iy = y + (h - 23) / 2 - 6;
-        g.renderItem(stack, ix, iy);
+        g.item(stack, ix, iy);
         drawCenteredNoShadow(g, caption, x + w / 2, y + h - 15, MUTED);
     }
 
-    private void drawCenteredNoShadow(GuiGraphics g, String text, int centerX, int y, int color) {
-        g.drawString(font, text, centerX - font.width(text) / 2, y, color, false);
+    private void drawCenteredNoShadow(GuiGraphicsExtractor g, String text, int centerX, int y, int color) {
+        g.text(font, text, centerX - font.width(text) / 2, y, color, false);
     }
 
-    private void drawCallout(GuiGraphics g, int x, int y, int w, String title, String body, int color) {
+    private void drawCallout(GuiGraphicsExtractor g, int x, int y, int w, String title, String body, int color) {
         List<FormattedCharSequence> lines = font.split(Component.literal(body), w - 10);
         int h = 19 + lines.size() * (font.lineHeight + 1);
         g.fill(x, y, x + w, y + h, 0x557C6845);
         g.fill(x + 2, y + 2, x + w - 2, y + h - 2, 0x55FFF2CB);
         g.fill(x, y, x + 3, y + h, color);
-        g.drawString(font, title, x + 7, y + 5, color, false);
+        g.text(font, title, x + 7, y + 5, color, false);
         int ty = y + 16;
         for (FormattedCharSequence line : lines) {
-            g.drawString(font, line, x + 7, ty, INK, false);
+            g.text(font, line, x + 7, ty, INK, false);
             ty += font.lineHeight + 1;
         }
     }
 
-    private int drawStatLine(GuiGraphics g, int x, int y, String label, String value, int color) {
-        g.drawString(font, label, x, y, MUTED, false);
-        g.drawString(font, value, x + pageW - 16 - font.width(value), y, color, false);
+    private int drawStatLine(GuiGraphicsExtractor g, int x, int y, String label, String value, int color) {
+        g.text(font, label, x, y, MUTED, false);
+        g.text(font, value, x + pageW - 16 - font.width(value), y, color, false);
         g.fill(x, y + 11, x + pageW - 14, y + 12, 0x19715E42);
         return y + 14;
     }
 
-    private void drawSelection(GuiGraphics g, int x, int y, int w, int h) {
+    private void drawSelection(GuiGraphicsExtractor g, int x, int y, int w, int h) {
         g.fill(x, y, x + w, y + h, 0x3F6A7D3E);
         g.fill(x, y, x + 3, y + h, ACCENT);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+    public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean doubleClick) {
+        double mouseX = event.x(), mouseY = event.y(); int button = event.button();
+        if (super.mouseClicked(event, doubleClick)) return true;
         if (button == 0 && detailScroll.maximum() > 0
             && mouseX >= detailBarX() - 2 && mouseX < detailBarX() + 8 && mouseY >= detailTop() && mouseY < detailTop() + detailHeight()) {
             double relative = mouseY - detailTop();
@@ -1035,18 +1039,18 @@ public final class FieldGuideScreen extends Screen {
         return f2(c.lastAmendmentAmount()) + " " + unit + " @ " + f2(c.lastAmendmentConcentration()) + "x";
     }
 
-    private void drawSectionTitle(GuiGraphics g, int x, int y, String title) {
-        g.drawString(font, title, x, y, ACCENT_DARK, false);
+    private void drawSectionTitle(GuiGraphicsExtractor g, int x, int y, String title) {
+        g.text(font, title, x, y, ACCENT_DARK, false);
         g.fill(x, y + 12, x + pageW - 12, y + 13, 0x66705A3D);
         for (int dot = x; dot < x + pageW - 13; dot += 5) {
             g.fill(dot, y + 14, dot + 2, y + 15, 0x55705A3D);
         }
     }
 
-    private int drawWrapped(GuiGraphics g, String text, int x, int y, int width, int color) {
+    private int drawWrapped(GuiGraphicsExtractor g, String text, int x, int y, int width, int color) {
         List<FormattedCharSequence> lines = font.split(Component.literal(text), width);
         for (FormattedCharSequence line : lines) {
-            g.drawString(font, line, x, y, color, false);
+            g.text(font, line, x, y, color, false);
             y += font.lineHeight + 1;
         }
         if (x >= rightX) detailBottom = Math.max(detailBottom, y);

@@ -1,3 +1,11 @@
+# Native platform status
+
+Retain 1.21.1, prioritize 26.1.2 playable integration, and develop 26.3 toward 26.4. The native 26.1.2 source now compiles and passes 74 model tests; actual TFC/Framework runtime, Mixin, GUI, crop and world-upgrade acceptance remains open. The roadmap below is inherited feature/history context, not proof of 26.x runtime support.
+
+See [native validation](docs/ports/26.1.2/VALIDATION.md) for evidence and blockers. Earlier beta records below refer to 1.21.1.
+
+---
+
 # Current delivery note - 0.1.0-beta
 
 The R7/R8 and 0.0.4a through 0.0.7a implementation packages are now combined in 0.1.0-beta for 1.21.1. The detailed roadmap below is retained as historical planning, not a current checklist of absent code. Consult [ROADMAP_0.1.md](ROADMAP_0.1.md) and [the beta validation matrix](docs/beta/VALIDATION.md) for implemented work versus remaining acceptance. Manual in-game, multiplayer, seasonal and optional-integration tests remain open; the 26.3 Soil port is separate and pending. This is not a stable 1.0.

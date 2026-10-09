@@ -9,7 +9,7 @@ import com.foundations.soil.amendment.AmendmentRegistry;
 import com.foundations.soil.crop.CropDefinition;
 import com.foundations.soil.crop.CropFamily;
 import com.foundations.soil.crop.CropRegistry;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +36,7 @@ class AgronomyRegistryTest {
 
     @Test
     void externalCropOverrideSurvivesDataReload() {
-        ResourceLocation wheat = ResourceLocation.fromNamespaceAndPath("tfc", "crop/wheat");
+        Identifier wheat = Identifier.fromNamespaceAndPath("tfc", "crop/wheat");
         CropRegistry.register(wheat, new CropDefinition(CropFamily.GRAIN, 6.1, 6.2, .90, .10, .70, .80));
         CropRegistry.resetDataDefinitions();
 

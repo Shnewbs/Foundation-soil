@@ -16,7 +16,7 @@ public final class SoilNetwork {
     private static final java.util.Map<ServerPlayer, RequestWindow> REQUESTS = new java.util.WeakHashMap<>();
     private static RequestWindow window(ServerPlayer player) { return REQUESTS.computeIfAbsent(player, ignored -> new RequestWindow()); }
     public static void clear() { REQUESTS.clear(); }
-    public static boolean permitLedgerOpen(ServerPlayer player) { return window(player).read(player.serverLevel().getGameTime()); }
+    public static boolean permitLedgerOpen(ServerPlayer player) { return window(player).read(player.level().getGameTime()); }
     private SoilNetwork() {}
 
     public static void register(RegisterPayloadHandlersEvent event) {
@@ -30,7 +30,7 @@ public final class SoilNetwork {
         registrar.playToServer(LaboratoryQueryPayload.TYPE, LaboratoryQueryPayload.STREAM_CODEC, SoilNetwork::laboratory);
         registrar.playToServer(LedgerEditPayload.TYPE, LedgerEditPayload.STREAM_CODEC, SoilNetwork::edit);
         registrar.playToServer(FieldGuidePageRequest.TYPE, FieldGuidePageRequest.STREAM_CODEC, (payload, context) -> {
-            if (context.player() instanceof ServerPlayer player && window(player).read(player.serverLevel().getGameTime()))
+            if (context.player() instanceof ServerPlayer player && window(player).read(player.level().getGameTime()))
                 context.reply(new FieldGuidePageReply(FieldGuideDataPayload.from(player, payload.fieldOffset(), payload.cellOffset())));
         });
         registrar.playToClient(LedgerEditReply.TYPE, LedgerEditReply.STREAM_CODEC,
@@ -43,11 +43,11 @@ public final class SoilNetwork {
     }
 
     private static void laboratory(LaboratoryQueryPayload payload, IPayloadContext context) {
-        if (!(context.player() instanceof ServerPlayer player) || !window(player).read(player.serverLevel().getGameTime())) return;
+        if (!(context.player() instanceof ServerPlayer player) || !window(player).read(player.level().getGameTime())) return;
         BlockPos position = BlockPos.of(payload.position());
         if (player.distanceToSqr(position.getX() + .5, position.getY() + .5, position.getZ() + .5) > 64
-            || !player.serverLevel().hasChunkAt(position)
-            || !player.serverLevel().getBlockState(position).is(com.foundations.soil.registry.SoilBlocks.LABORATORY.get())) {
+            || !player.level().hasChunkAt(position)
+            || !player.level().getBlockState(position).is(com.foundations.soil.registry.SoilBlocks.LABORATORY.get())) {
             context.reply(new LaboratoryResultPayload(payload.requestId(), java.util.List.of("Return to the Soil Laboratory to request analysis."), java.util.List.of()));
             return;
         }
@@ -58,7 +58,7 @@ public final class SoilNetwork {
 
     private static void edit(LedgerEditPayload payload, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer player)) return;
-        if (!window(player).edit(payload.requestId(), player.serverLevel().getGameTime())) {
+        if (!window(player).edit(payload.requestId(), player.level().getGameTime())) {
             context.reply(new LedgerEditReply(payload.requestId(), "Duplicate or too-frequent request; reopen the guide to verify.", null));
             return;
         }
@@ -68,13 +68,13 @@ public final class SoilNetwork {
     }
 
     private static void handleRequest(SoilHudRequestPayload payload, IPayloadContext context) {
-        if (!(context.player() instanceof ServerPlayer player) || !window(player).hud(player.serverLevel().getGameTime())) return;
+        if (!(context.player() instanceof ServerPlayer player) || !window(player).hud(player.level().getGameTime())) return;
 
         BlockPos pos = BlockPos.of(payload.packedPos());
         if (player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > MAX_INSPECTION_DISTANCE_SQR) return;
-        if (!player.serverLevel().hasChunkAt(pos)) return;
+        if (!player.level().hasChunkAt(pos)) return;
 
-        BlockState state = player.serverLevel().getBlockState(pos);
+        BlockState state = player.level().getBlockState(pos);
         boolean probe = SoilHudTools.probeHeld(player);
         boolean hoe = SoilHudTools.hoeHeld(player);
         if (!probe && !hoe) return;
@@ -84,7 +84,7 @@ public final class SoilNetwork {
             return;
         }
 
-        var cell = SoilManager.getOrCreate(player.serverLevel(), pos);
-        context.reply(SoilHudSnapshotPayload.from(player.serverLevel(), pos, cell));
+        var cell = SoilManager.getOrCreate(player.level(), pos);
+        context.reply(SoilHudSnapshotPayload.from(player.level(), pos, cell));
     }
 }

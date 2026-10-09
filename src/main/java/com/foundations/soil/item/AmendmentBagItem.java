@@ -49,12 +49,12 @@ public final class AmendmentBagItem extends Item {
         var cell = applied.cell();
         var profile = cell.profile();
 
-        player.displayClientMessage(Component.literal(
+        player.sendOverlayMessage(Component.literal(
             amendment.displayName() + " applied | pH " + String.format(java.util.Locale.ROOT, "%.2f", profile.pH())
                 + " | OM " + Math.round(profile.organicMatter() * 100) + "%"
                 + " | Structure " + SoilLabels.quality(profile.structure())
                 + (applied.outcome().pendingReleases() > 0 ? " | Release pending " + applied.outcome().pendingReleases() : "")
-        ).withStyle(ChatFormatting.GREEN), true);
+        ).withStyle(ChatFormatting.GREEN));
 
         if (!player.getAbilities().instabuild) consumeOne(context.getItemInHand(), context);
         return InteractionResult.SUCCESS;

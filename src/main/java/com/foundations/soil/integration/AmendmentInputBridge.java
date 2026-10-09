@@ -6,14 +6,14 @@ import com.foundations.soil.api.input.SoilExternalInput;
 import com.foundations.soil.api.input.SoilInputHooks;
 import com.foundations.soil.api.input.SoilInputResult;
 import com.foundations.soil.api.input.SoilInputType;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 /**
  * Built-in adapter from generic R7 external-input channels into the 0.0.3a amendment engine.
  * It does not transport fluids/items; it only accepts a delivery event that another mod already performed.
  */
 public final class AmendmentInputBridge {
-    private static final ResourceLocation OWNER = ResourceLocation.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "amendment_engine");
+    private static final Identifier OWNER = Identifier.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "amendment_engine");
     private static SoilInputHooks.Registration solid;
     private static SoilInputHooks.Registration liquid;
     private static SoilInputHooks.Registration fertigation;

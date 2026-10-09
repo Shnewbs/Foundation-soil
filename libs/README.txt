@@ -1,13 +1,18 @@
-Foundations Soil 0.0.3a runtime dependency
-=========================================
+Native runtime dependencies for the Minecraft 26.1.2 port
 
-Foundations Soil requires Foundations Framework at runtime.
-The mod metadata accepts Framework 0.0.5a or newer.
+Default clean test build compiles against real Minecraft/NeoForge and runs model tests.
+It does not load TFC or Framework and never bundles their implementations.
 
-The R8 Framework bridge uses reflection so this source tree does not require
-Framework API classes at Java compile time. You may still place:
+For runClient, runServer or -PmodRuntimeTests=true, supply genuine native JARs:
+  libs/TFC-Foundations-26.1.2.jar
+  libs/foundations_framework-26.1.2.jar
+The names are configurable with -Ptfc_jar=... and -Pframework_jar=....
+The early Gradle check rejects mismatched mod IDs/Minecraft ranges; the actual
+loader and fail-closed TFC API checks remain authoritative.
 
-    foundations_framework-0.0.5a.jar
+Patchouli 26.1-94 and JEI 29.43.0.107 are resolved only for requested runtime
+validation, matching the inspected TFC-Foundations branch. They are not
+bundled in the Soil release. Never supply 1.21.1 or 26.3 JARs here.
 
-in this directory as a localRuntime/test helper. Use your current compatible
-Framework JAR in the Minecraft test instance.
+At the source checkpoint used for this port, TFC-Foundations had no published
+26.1.2 release and Framework native runtime was not available for testing.

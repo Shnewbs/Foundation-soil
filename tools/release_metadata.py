@@ -10,9 +10,9 @@ def metadata(tag, properties):
     expected = f'mc-{minecraft}-v{version}'
     if tag != expected:
         raise ValueError(f'Tag must be {expected!r} for this source, got {tag!r}')
-    if minecraft not in {'1.21.1', '26.3', '26.4'}:
+    if minecraft not in {'1.21.1', '26.1.2', '26.3', '26.4'}:
         raise ValueError(f'Unsupported release platform: {minecraft}')
-    if not re.fullmatch(r'[0-9]+(?:\.[0-9]+)*(?:[ab](?:\.R[0-9]+)?|-(?:alpha|beta|rc)[.0-9]*)?', version):
+    if not re.fullmatch(r'[0-9]+(?:\.[0-9]+)*(?:[ab](?:\.R[0-9]+)?|-(?:alpha|beta|rc)(?:[.-][0-9A-Za-z]+)*)?', version):
         raise ValueError(f'Unrecognized version format: {version}')
     return {'minecraft': minecraft, 'version': version,
             'java': properties['java_version'],

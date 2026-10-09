@@ -79,7 +79,7 @@ public final class SoilHudClientEvents {
         ClientSoilHudState.target(packed);
 
         if (changed || requestCooldown-- <= 0) {
-            PacketDistributor.sendToServer(new SoilHudRequestPayload(packed));
+            net.neoforged.neoforge.client.network.ClientPacketDistributor.sendToServer(new SoilHudRequestPayload(packed));
             requestCooldown = 4;
         }
     }

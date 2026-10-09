@@ -1,5 +1,6 @@
 {
-  "loader": "neoforge:fluid_container",
-  "parent": "neoforge:item/bucket",
-  "fluid": "foundations_soil:sulfur_suspension"
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "minecraft:item/bucket"
+  }
 }

@@ -1,65 +1,69 @@
-# Foundations Soil
+# Foundations Soil — native 26.1.2 development port
 
-A TerraFirmaCraft expansion with persistent living-soil cells, amendments, and field records.
+**`0.1.0-beta-port.1` · Minecraft 26.1.2 · NeoForge 26.1.2.114 · Java 25**
 
-**Version: `0.1.0-beta` for Minecraft 1.21.1.** This beta combines the R7/R8, 0.0.4a, 0.0.5a, 0.0.6a and 0.0.7a implementation packages. Intermediate versions were not separately released. It is not a final 1.0 or a claim that manual game testing is complete.
+The full 1.21.1 `0.1.0-beta` Soil feature implementation has been migrated to native
+26.1.2 APIs. **This is a compiled development port, not a validated playable modpack.**
+TFC and Foundations Framework remain hard runtime dependencies. Their native
+26.1.2 builds must be available and validated before gameplay testing can pass.
 
-## Included in this beta
+## Included
 
-- Scrollable Field Guide details, bounded server paging, and GUI field creation, renaming, deletion, assignment, notes and favorites.
-- Persistent sand/silt/clay composition; climate-informed initial profiles; derived drainage, water-holding, aeration and root-zone response.
-- A craftable Soil Laboratory with two comparison panes, complete-field snapshot analysis and up to 16 observed trend points per monitored cell.
-- TFC maturity/picking-history fixes, a configurable newly-earned-yield response, and API contract 3 physical snapshots and abstract tolerance inputs.
-- Protocol 8 input bounds, cooldown/replay controls, stricter persistence validation, and protection against replacing unreadable saved data with an empty record.
-- Existing seven soil statistics, TFC-calendar simulation, crop rotation, residue, solid/liquid amendments, delayed releases and integration gateways remain available.
+Persistent living-soil cells and history, physical composition and root-zone
+response, solid/liquid amendments and delayed releases, Field Guide scrolling and
+field editing, Soil Laboratory comparisons/trends, and integration APIs remain in
+source. The port adds native saved-data codecs/namespaces, rendering/input APIs,
+item/fluid definitions and transaction-based fluid containers. It does not replace
+TFC's calendar, climate, hydration, crop growth or stored N/P/K.
 
-TFC owns calendar, climate, hydration, crop growth/expiry and stored N/P/K. Soil does not implement fluid transport or genetics. The yield bridge modifies only positive newly accumulated yield and can be disabled with `crop_response.tfc_yield_response_strength=0.0`.
-
-## Requirements
-
-| Component | Requirement |
-| --- | --- |
-| Minecraft / Java | 1.21.1 / Java 21 |
-| NeoForge | Pinned to 21.1.250 |
-| TerraFirmaCraft | Build pinned to file 8831715 (4.2.10); metadata minimum 4.2.8 |
-| Patchouli | Build pinned to 1.21.1-92-NEOFORGE; required by TFC |
-| Foundations Framework | Genuine compatible 1.21.1 build, metadata minimum 0.0.5a |
-
-Other dependency versions require separate runtime validation. Framework remains required; it is not bundled or replaced with a stub.
-
-## Upgrade safely
-
-**Back up the entire world before upgrading.** Soil Cell schema/model change from 3/3 to 4/4; Field Ledger schema changes from 4 to 5; network protocol changes from 7 to 8. Use matching client/server beta JARs. Do not downgrade an upgraded world: restore the backup instead.
-
-If saved data cannot be read, the guard refuses an empty replacement. Stop the server and repair or restore the original file rather than deleting it to silence the error.
-
-## Build and verification
+## Build
 
 ```sh
 ./gradlew --no-daemon clean test build soilScaleBenchmark
 ```
 
-Windows users can use `gradlew.bat` with the same arguments. Outputs include `build/libs/foundations_soil-1.21.1-0.1.0-beta.jar` and the sources JAR. Benchmark output is `build/reports/soil-scale-benchmark.json`.
+Windows: `build_mod.bat` or the equivalent `gradlew.bat` command. A first build
+requires network access. The main output is:
 
-The standalone model suite contains **70 passing tests** against the actual pinned dependency classpath. Tests cover migration, persistence, ownership, packets, resources and exact TFC hook targets. The GitHub release pipeline reruns native Gradle compilation, tests and the benchmark before publishing. These results are not evidence of a full game launch or live-server TPS.
+`build/libs/foundations_soil-26.1.2-0.1.0-beta-port.1.jar`
 
-Full mod-loading tests are a separate mode:
+The sources JAR and complete source archive are development files, not mods to put
+into a game's `mods` folder.
 
-```sh
-./gradlew --no-daemon -PmodRuntimeTests=true clean test
-```
+**74 native model tests pass**; three TFC-dependent tests are excluded from that
+suite and await real runtime dependencies. Model tests do not start the modpack.
+The 1k/10k/50k benchmarks check model/storage round trips, not live server TPS.
 
-This requires the genuine Framework JAR at the configured `libs/<framework_jar>` path. Client/dedicated-server launches, in-game Mixin transformation, GUI-scale checks, real-world upgrades, seasonal balance and optional-integration pack tests remain open. See [the validation matrix](docs/beta/VALIDATION.md).
+## Runtime dependency gate
 
-## Documentation
+The inspected TFC-Foundations `26.1.2` commit is
+`c350b69e1300c128e3db53af947a896aa37dbca5` (candidate `0.0.0`, no playable release).
+A compatible Framework native runtime was not available for this validation.
 
-- [Beta release notes](docs/beta/RELEASE_NOTES.md)
-- [Executed evidence and open testing gates](docs/beta/VALIDATION.md)
-- [API contract 3](docs/beta/INTEGRATION_CONTRACT.md)
-- [0.1 milestone tracking](ROADMAP_0.1.md)
-- [Roadmap to 1.0](ROADMAP_TO_1.0.md)
-- [Changelog](CHANGELOG.md), [configuration](CONFIGURATION.md), [Field Ledger](FIELD_LEDGER.md)
+For real runtime tests, supply genuine native artifacts in `libs/` as described in
+[libs/README.txt](libs/README.txt). Then use `-PmodRuntimeTests=true clean test`,
+`runClient` or `runServer`. Old-version JARs are rejected, and a missing/incompatible
+TFC API fails closed. No vanilla fallback, synthetic target classes or stub mods
+are included. Patchouli/JEI runtime pins follow the inspected target TFC branch.
 
-## Platform and release policy
+## Validation and safe testing
 
-Retain 1.21.1 while developing the newer 26.3 line separately; move that newer line to 26.4 when released and compatible dependencies are validated. **This beta is 1.21.1 only; the Soil 26.3 port is pending.** Every platform release must publish its own built JAR and source on GitHub Releases. This beta uses tag `mc-1.21.1-v0.1.0-beta` and is a prerelease, not a stable/latest release.
+Read [the exact evidence and open gates](docs/ports/26.1.2/VALIDATION.md) and
+[release notes](docs/ports/26.1.2/RELEASE_NOTES.md). Full game launches, actual TFC API
+binding/Mixins, crop/fluids, rendering/input, multiplayer and seasonal tests remain
+unexecuted. **Do not use this development build in a production world.**
+
+Back up complete worlds. Native storage import preserves original legacy Soil
+files, but this does not establish whole-world Minecraft/TFC upgrade or downgrade
+compatibility. Soil payload schema/model remain 4/4; Field Ledger schema remains 5;
+network protocol remains 8 within the strictly matching native platform.
+
+## Branch and release policy
+
+- `main`: retain Minecraft **1.21.1**, published `0.1.0-beta`.
+- `mc-26.1.2`: this native development port; next playable integration target.
+- `mc-26.3`: planned parallel development toward **26.4**; no Soil binary included here.
+
+Publish each platform's own JAR and source as a GitHub Release. This port uses
+`mc-26.1.2-v0.1.0-beta-port.1`, a development prerelease, never the stable/latest build.
+Earlier `docs/beta/` validation records describe **1.21.1**, not native 26.x acceptance.

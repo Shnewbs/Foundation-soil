@@ -1,3 +1,11 @@
+# 26.1.2 port configuration
+
+Gameplay settings are retained from the beta. This branch uses Java 25 and native 26.1.2 build pins, not the 1.21.1 dependencies described in historical examples. Required TFC/Framework runtime checks remain in place. Model-only compilation does not create a standalone Soil mode.
+
+See [native validation](docs/ports/26.1.2/VALIDATION.md) for evidence and blockers. Earlier beta records below refer to 1.21.1.
+
+---
+
 # 0.1.0-beta configuration additions
 
 ```toml

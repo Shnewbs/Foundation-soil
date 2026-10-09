@@ -7,8 +7,8 @@
     " P "
   ],
   "key": {
-    "P": { "item": "minecraft:paper" },
-    "B": { "item": "minecraft:book" }
+    "P": "minecraft:paper",
+    "B": "minecraft:book"
   },
   "result": {
     "id": "foundations_soil:field_guide",

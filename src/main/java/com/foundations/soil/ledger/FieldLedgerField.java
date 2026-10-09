@@ -36,9 +36,9 @@ public final class FieldLedgerField {
     }
 
     public static FieldLedgerField load(CompoundTag tag) {
-        FieldLedgerField field = new FieldLedgerField(tag.getInt("id"), tag.getString("name"));
-        field.note = clean(tag.getString("note"), 256);
-        field.favorite = tag.getBoolean("favorite");
+        FieldLedgerField field = new FieldLedgerField(tag.getInt("id").orElse(0), tag.getString("name").orElse(""));
+        field.note = clean(tag.getString("note").orElse(""), 256);
+        field.favorite = tag.getBoolean("favorite").orElse(false);
         return field;
     }
 

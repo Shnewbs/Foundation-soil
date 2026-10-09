@@ -4,7 +4,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -12,8 +12,8 @@ import net.minecraft.world.level.block.state.BlockState;
  * destroying extension registrations made through the public API / KubeJS.
  */
 public final class CropRegistry {
-    private static final Map<ResourceLocation, CropDefinition> DATA_DEFINITIONS = new ConcurrentHashMap<>();
-    private static final Map<ResourceLocation, CropDefinition> EXTENSIONS = new ConcurrentHashMap<>();
+    private static final Map<Identifier, CropDefinition> DATA_DEFINITIONS = new ConcurrentHashMap<>();
+    private static final Map<Identifier, CropDefinition> EXTENSIONS = new ConcurrentHashMap<>();
     private static final Map<CropFamily, CropFamilyDefinition> FAMILY_DATA = new EnumMap<>(CropFamily.class);
 
     static { resetToDefaults(); }
@@ -50,13 +50,13 @@ public final class CropRegistry {
     }
 
     /** Public extension registration. Survives definition reloads and wins over JSON. */
-    public static void register(ResourceLocation id, CropDefinition definition) {
+    public static void register(Identifier id, CropDefinition definition) {
         validate(id, definition);
         EXTENSIONS.put(id, definition);
     }
 
     /** Data-loader registration. Replaced whenever /fsoil definitions reload runs. */
-    public static void registerData(ResourceLocation id, CropDefinition definition) {
+    public static void registerData(Identifier id, CropDefinition definition) {
         validate(id, definition);
         DATA_DEFINITIONS.put(id, definition);
     }
@@ -64,7 +64,7 @@ public final class CropRegistry {
     public static void register(String id, String family, double phMin, double phMax,
                                 double compactionTolerance, double drainageMinimum,
                                 double drainagePreferred, double organicMatterResponse) {
-        ResourceLocation key = ResourceLocation.tryParse(id);
+        Identifier key = Identifier.tryParse(id);
         if (key == null) throw new IllegalArgumentException("Invalid crop id: " + id);
         register(key, new CropDefinition(CropFamily.parse(family), phMin, phMax, compactionTolerance,
             drainageMinimum, drainagePreferred, organicMatterResponse));
@@ -89,7 +89,7 @@ public final class CropRegistry {
         return resolve(BuiltInRegistries.BLOCK.getKey(state.getBlock()));
     }
 
-    public static CropDefinition resolve(ResourceLocation id) {
+    public static CropDefinition resolve(Identifier id) {
         CropDefinition external = EXTENSIONS.get(id);
         if (external != null) return external;
         CropDefinition data = DATA_DEFINITIONS.get(id);
@@ -97,7 +97,7 @@ public final class CropRegistry {
     }
 
     public static boolean isCultivatedCrop(BlockState state) {
-        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+        Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         if (id == null) return false;
         if (id.getNamespace().equals("tfc") && id.getPath().startsWith("crop/")) return true;
         return state.getBlock() instanceof net.minecraft.world.level.block.CropBlock;
@@ -113,7 +113,7 @@ public final class CropRegistry {
         return false;
     }
 
-    public static CropFamily inferFamily(ResourceLocation id) {
+    public static CropFamily inferFamily(Identifier id) {
         String path = id == null ? "" : id.getPath();
         String name = path.substring(path.lastIndexOf('/') + 1);
         if (matches(name, "barley", "maize", "oat", "rice", "rye", "wheat")) return CropFamily.GRAIN;
@@ -130,7 +130,7 @@ public final class CropRegistry {
     public static int externalCount() { return EXTENSIONS.size(); }
     public static int familyCount() { return FAMILY_DATA.size(); }
 
-    private static void validate(ResourceLocation id, CropDefinition definition) {
+    private static void validate(Identifier id, CropDefinition definition) {
         if (id == null || definition == null) throw new IllegalArgumentException("crop id/definition cannot be null");
     }
 

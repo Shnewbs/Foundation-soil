@@ -1,3 +1,11 @@
+# Native platform status
+
+Retain 1.21.1, prioritize 26.1.2 playable integration, and develop 26.3 toward 26.4. The native 26.1.2 source now compiles and passes 74 model tests; actual TFC/Framework runtime, Mixin, GUI, crop and world-upgrade acceptance remains open. The roadmap below is inherited feature/history context, not proof of 26.x runtime support.
+
+See [native validation](docs/ports/26.1.2/VALIDATION.md) for evidence and blockers. Earlier beta records below refer to 1.21.1.
+
+---
+
 # Foundations Soil - 0.1.0-beta delivery status
 
 Baseline: 0.0.3a.R6. The intervening implementation packages are combined into **0.1.0-beta**; no intermediate releases are invented. A feature implementation is not the same as completed in-game acceptance.
