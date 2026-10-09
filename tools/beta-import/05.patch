@@ -1,0 +1,312 @@
+diff --git a/src/main/java/com/foundations/soil/config/SoilConfig.java b/src/main/java/com/foundations/soil/config/SoilConfig.java
+index 392ab186b749c107fa83ea14b097ffb3cb5ec633..244e733a6a95d56bd6e2c67fca10789c3b1f7bb2 100644
+--- a/src/main/java/com/foundations/soil/config/SoilConfig.java
++++ b/src/main/java/com/foundations/soil/config/SoilConfig.java
+@@ -8,0 +9 @@ public final class SoilConfig {
++    public static final ModConfigSpec.DoubleValue TFC_YIELD_RESPONSE_STRENGTH;
+@@ -56,0 +58,5 @@ public final class SoilConfig {
++        b.push("crop_response");
++        TFC_YIELD_RESPONSE_STRENGTH = b.comment("Blend applied only to newly accumulated TFC crop yield. 0 disables the bridge; 1 applies the full Soil response.",
++            "Does not replace TFC growth, expiry, hydration, or stored N/P/K. Native pack/API compatibility testing is still required for beta.")
++            .defineInRange("tfc_yield_response_strength", 0.5, 0.0, 1.0);
++        b.pop();
+diff --git a/src/main/java/com/foundations/soil/crop/CropRegistry.java b/src/main/java/com/foundations/soil/crop/CropRegistry.java
+index a6f7c38c4d2f0d943fa77755e64d5194979a40a2..c5521becf00aaa3cc3d973a617d8e9be86b386d5 100644
+--- a/src/main/java/com/foundations/soil/crop/CropRegistry.java
++++ b/src/main/java/com/foundations/soil/crop/CropRegistry.java
+@@ -107 +107,7 @@ public final class CropRegistry {
+-        return !(state.getBlock() instanceof net.minecraft.world.level.block.CropBlock crop) || crop.isMaxAge(state);
++        if (state.getBlock() instanceof net.minecraft.world.level.block.CropBlock crop) return crop.isMaxAge(state);
++        // Fallback for callers without a block entity: unknown maturity must not award a harvest.
++        for (var property : state.getProperties()) {
++            if (property instanceof net.minecraft.world.level.block.state.properties.IntegerProperty age && age.getName().equals("age"))
++                return state.getValue(age).equals(age.getPossibleValues().stream().max(Integer::compareTo).orElse(Integer.MAX_VALUE));
++        }
++        return false;
+diff --git a/src/main/java/com/foundations/soil/event/SoilGameplayEvents.java b/src/main/java/com/foundations/soil/event/SoilGameplayEvents.java
+index 1226a28e801f52c0e13d7eb58464b1288cd8ae1e..08ba61c5f50459bd35479b8944027a52100e3d99 100644
+--- a/src/main/java/com/foundations/soil/event/SoilGameplayEvents.java
++++ b/src/main/java/com/foundations/soil/event/SoilGameplayEvents.java
+@@ -36,0 +37 @@ public final class SoilGameplayEvents {
++        com.foundations.soil.network.SoilNetwork.clear();
+@@ -55 +56,3 @@ public final class SoilGameplayEvents {
+-            SoilManager.recordCropRemoval(level, soil, def.family(), CropRegistry.isMature(event.getState()));
++            boolean mature = level.getBlockEntity(soil.above()) instanceof net.dries007.tfc.common.blockentities.CropBlockEntity crop
++                ? crop.getGrowth() >= 1.0f : CropRegistry.isMature(event.getState());
++            SoilManager.recordCropRemoval(level, soil, def.family(), mature);
+diff --git a/src/main/java/com/foundations/soil/event/SoilSimulationScheduler.java b/src/main/java/com/foundations/soil/event/SoilSimulationScheduler.java
+index 314732c90f1570f53c9fab5f9f672eef0689b90d..26e95c0dc6b42a901bc38edacfa8a9608b502a82 100644
+--- a/src/main/java/com/foundations/soil/event/SoilSimulationScheduler.java
++++ b/src/main/java/com/foundations/soil/event/SoilSimulationScheduler.java
+@@ -16 +16 @@ final class SoilSimulationScheduler {
+-        if (state == null || day > state.day) {
++        if (state == null || (day > state.day && state.index >= state.keys.length)) {
+@@ -27 +27 @@ final class SoilSimulationScheduler {
+-            if (SoilManager.simulatePacked(level, state.keys[state.index++], day)) changed++;
++            if (SoilManager.simulatePacked(level, state.keys[state.index++], state.day)) changed++;
+@@ -30 +30 @@ final class SoilSimulationScheduler {
+-            SoilRuntimeMetrics.recordBatch(day, attempted, changed, System.nanoTime() - started);
++            SoilRuntimeMetrics.recordBatch(state.day, attempted, changed, System.nanoTime() - started);
+diff --git a/src/main/java/com/foundations/soil/integration/TfcCropResponseBridge.java b/src/main/java/com/foundations/soil/integration/TfcCropResponseBridge.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0d4433dda1701d2091201ae0f607e1b2f2e35cbc
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/integration/TfcCropResponseBridge.java
+@@ -0,0 +1,29 @@
++package com.foundations.soil.integration;
++
++import com.foundations.soil.api.SoilResponse;
++import com.foundations.soil.api.SoilTraits;
++import com.foundations.soil.config.SoilConfig;
++import com.foundations.soil.crop.CropRegistry;
++import com.foundations.soil.soil.SoilManager;
++import com.foundations.soil.soil.SoilTargeting;
++import net.dries007.tfc.common.blocks.soil.FarmlandBlock;
++import net.minecraft.core.BlockPos;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.world.level.Level;
++import net.minecraft.world.level.block.state.BlockState;
++
++public final class TfcCropResponseBridge {
++    private TfcCropResponseBridge() {}
++    public static float yield(Level level, BlockPos pos, BlockState cropState, float previous, float proposed) {
++        if (!(level instanceof ServerLevel server) || proposed <= previous) return proposed;
++        double strength = SoilConfig.TFC_YIELD_RESPONSE_STRENGTH.get();
++        if (strength <= 0) return proposed;
++        BlockPos soil = pos.below();
++        if (!SoilTargeting.isSoil(level.getBlockState(soil))) return proposed;
++        var cell = SoilManager.getOrCreate(server, soil);
++        // No nutrient writes, no growth/expiry writes, and no repeated scaling of existing yield.
++        var response = SoilResponse.evaluate(cell.profile(), cell.texture(), CropRegistry.resolve(cropState), SoilTraits.NEUTRAL,
++            FarmlandBlock.getInstantHydration(level, soil) / 100.0, cell.continuousPressure());
++        return SoilResponse.applyYield(previous, proposed, response.combined(), strength);
++    }
++}
+diff --git a/src/main/java/com/foundations/soil/ledger/FieldLedgerData.java b/src/main/java/com/foundations/soil/ledger/FieldLedgerData.java
+index 690366a4403a13f20cdcfa8183c790fa8d6ab2f0..f291b804c77eef33dde8d9bc211c6a4e7b746fd9 100644
+--- a/src/main/java/com/foundations/soil/ledger/FieldLedgerData.java
++++ b/src/main/java/com/foundations/soil/ledger/FieldLedgerData.java
+@@ -17 +17 @@ public final class FieldLedgerData extends SavedData {
+-    public static final int SCHEMA_VERSION = 4;
++    public static final int SCHEMA_VERSION = 5;
+@@ -40 +40 @@ public final class FieldLedgerData extends SavedData {
+-        ListTag players = root.getList("players", Tag.TAG_COMPOUND);
++        ListTag players = com.foundations.soil.storage.SavedTagChecks.compounds(root, "players", true);
+@@ -43,6 +43,5 @@ public final class FieldLedgerData extends SavedData {
+-            try {
+-                UUID id = UUID.fromString(player.getString("uuid"));
+-                data.ledgers.put(id, PlayerFieldLedger.load(player.getCompound("ledger")));
+-            } catch (IllegalArgumentException ex) {
+-                FoundationsSoil.LOGGER.warn("[Foundations Soil] Skipping malformed Field Ledger player UUID: {}", player.getString("uuid"));
+-            }
++            final UUID id;
++            try { id = UUID.fromString(player.getString("uuid")); }
++            catch (IllegalArgumentException ex) { throw new IllegalStateException("Malformed Field Ledger owner; refusing to discard saved data", ex); }
++            PlayerFieldLedger ledger = PlayerFieldLedger.load(player.getCompound("ledger"));
++            if (data.ledgers.putIfAbsent(id, ledger) != null) throw new IllegalStateException("Duplicate Field Ledger owner " + id);
+diff --git a/src/main/java/com/foundations/soil/ledger/FieldLedgerEntry.java b/src/main/java/com/foundations/soil/ledger/FieldLedgerEntry.java
+index e651a4fc1c51b5fc698eca8164e768fef6315e3e..b9b38386b132167507d1b3cc7baf886b5fc728bb 100644
+--- a/src/main/java/com/foundations/soil/ledger/FieldLedgerEntry.java
++++ b/src/main/java/com/foundations/soil/ledger/FieldLedgerEntry.java
+@@ -37,0 +38,3 @@ public final class FieldLedgerEntry {
++    private com.foundations.soil.soil.SoilTexture texture;
++    private final com.foundations.soil.soil.SoilTrend trend = new com.foundations.soil.soil.SoilTrend();
++    private long lastProbeDay = -1;
+@@ -89,0 +93,6 @@ public final class FieldLedgerEntry {
++    public java.util.Optional<com.foundations.soil.soil.SoilTexture> texture() { return java.util.Optional.ofNullable(texture); }
++    public List<com.foundations.soil.soil.SoilTrend.Point> trendPoints() { return trend.points(); }
++    public long lastProbeDay() { return lastProbeDay; }
++    public com.foundations.soil.soil.SoilProfile profileSnapshot() {
++        return new com.foundations.soil.soil.SoilProfile(organicMatter, pH, drainage, compaction, structure, biology, salinity);
++    }
+@@ -146,0 +156,3 @@ public final class FieldLedgerEntry {
++        texture = cell.physicalInitialized() ? cell.texture() : null;
++        trend.clear();
++        for (var point : cell.trend().points()) trend.record(point.day(), point.profile(), point.cropPressure());
+@@ -193,0 +206 @@ public final class FieldLedgerEntry {
++        lastProbeDay = Math.max(0, net.dries007.tfc.util.calendar.Calendars.SERVER.getTotalCalendarDays());
+@@ -211,0 +225,7 @@ public final class FieldLedgerEntry {
++        tag.putLong("last_probe_day", lastProbeDay);
++        if (texture != null) {
++            CompoundTag physical = new CompoundTag();
++            physical.putDouble("sand", texture.sand()); physical.putDouble("silt", texture.silt()); physical.putDouble("clay", texture.clay());
++            tag.put("physical", physical);
++        }
++        tag.put("trend", trend.save());
+@@ -266,0 +287,6 @@ public final class FieldLedgerEntry {
++        entry.lastProbeDay = tag.contains("last_probe_day", Tag.TAG_LONG) ? tag.getLong("last_probe_day") : -1;
++        if (tag.contains("physical", Tag.TAG_COMPOUND)) {
++            CompoundTag physical = tag.getCompound("physical");
++            entry.texture = new com.foundations.soil.soil.SoilTexture(physical.getDouble("sand"), physical.getDouble("silt"), physical.getDouble("clay"));
++        }
++        entry.trend.load(tag.getList("trend", Tag.TAG_COMPOUND));
+@@ -279,0 +306,3 @@ public final class FieldLedgerEntry {
++        for (double value : new double[]{entry.organicMatter, entry.pH, entry.drainage, entry.compaction,
++                entry.structure, entry.biology, entry.salinity, entry.nutrientAccess})
++            if (!Double.isFinite(value)) throw new IllegalStateException("Non-finite saved ledger measurement");
+@@ -322,5 +351 @@ public final class FieldLedgerEntry {
+-    private static String clean(String value, int max) {
+-        if (value == null) return "";
+-        String normalized = value.replace('\n', ' ').replace('\r', ' ').trim();
+-        return normalized.length() <= max ? normalized : normalized.substring(0, max);
+-    }
++    private static String clean(String value, int max) { return LedgerText.clean(value, max); }
+@@ -329 +354,4 @@ public final class FieldLedgerEntry {
+-    private static double unit(double value) { return Math.max(0.0, Math.min(1.0, value)); }
++    private static double unit(double value) {
++        if (!Double.isFinite(value)) throw new IllegalArgumentException("Non-finite saved ledger value");
++        return Math.max(0.0, Math.min(1.0, value));
++    }
+diff --git a/src/main/java/com/foundations/soil/ledger/FieldLedgerField.java b/src/main/java/com/foundations/soil/ledger/FieldLedgerField.java
+index 28949a5b0becacdc66784c09b2e4454be3296f5a..681b52faea38512a4af4f36f93aeb4b639e78333 100644
+--- a/src/main/java/com/foundations/soil/ledger/FieldLedgerField.java
++++ b/src/main/java/com/foundations/soil/ledger/FieldLedgerField.java
+@@ -45,5 +45 @@ public final class FieldLedgerField {
+-    private static String clean(String value, int max) {
+-        if (value == null) return "";
+-        String normalized = value.replace('\n', ' ').replace('\r', ' ').trim();
+-        return normalized.length() <= max ? normalized : normalized.substring(0, max);
+-    }
++    private static String clean(String value, int max) { return LedgerText.clean(value, max); }
+diff --git a/src/main/java/com/foundations/soil/ledger/FieldLedgerManager.java b/src/main/java/com/foundations/soil/ledger/FieldLedgerManager.java
+index 52e387c1264cc30504f8de4a7888c32246a3fd54..c15ce6ee284bfc77507bf06e1f80f67a7564735a 100644
+--- a/src/main/java/com/foundations/soil/ledger/FieldLedgerManager.java
++++ b/src/main/java/com/foundations/soil/ledger/FieldLedgerManager.java
+@@ -25,3 +24,0 @@ public final class FieldLedgerManager {
+-    private static final SavedData.Factory<FieldLedgerData> FACTORY =
+-        new SavedData.Factory<>(FieldLedgerData::new, FieldLedgerData::load);
+-
+@@ -31 +28,16 @@ public final class FieldLedgerManager {
+-        return root.getDataStorage().computeIfAbsent(FACTORY, FieldLedgerData.DATA_NAME);
++        return com.foundations.soil.storage.SafeSavedData.get(root, FieldLedgerData.DATA_NAME, FieldLedgerData::new, FieldLedgerData::load);
++    }
++
++    public static List<String> laboratoryReport(ServerPlayer player, LaboratorySelection selection) {
++        return SoilLaboratoryReports.describe(data(player.serverLevel().getServer()).ledger(player.getUUID()), selection);
++    }
++
++    public static LedgerMutation.Result mutate(ServerPlayer player, LedgerMutation mutation) {
++        FieldLedgerData worldData = data(player.serverLevel().getServer());
++        LedgerMutation.Result result = mutation.apply(worldData.ledger(player.getUUID()));
++        if (result.success()) {
++            worldData.setDirty();
++            SoilEvents.bus().post(new SoilEvents.FieldUpdated(player.getUUID(), "", 0, 0, mutation.fieldId(),
++                "gui:" + mutation.action().name().toLowerCase(java.util.Locale.ROOT)));
++        }
++        return result;
+@@ -39,0 +52 @@ public final class FieldLedgerManager {
++        SoilManager.enableMonitoring(level, cell);
+diff --git a/src/main/java/com/foundations/soil/ledger/LaboratorySelection.java b/src/main/java/com/foundations/soil/ledger/LaboratorySelection.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..625e86726e6b8ebcfecce04db1b921fdc3a63142
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/ledger/LaboratorySelection.java
+@@ -0,0 +1,8 @@
++package com.foundations.soil.ledger;
++
++public record LaboratorySelection(boolean field, String cellKey, int fieldId) {
++    public LaboratorySelection {
++        if (cellKey == null || cellKey.length() > 160 || fieldId < 0) throw new IllegalArgumentException("Invalid laboratory selection");
++    }
++    public static LaboratorySelection none() { return new LaboratorySelection(false, "", 0); }
++}
+diff --git a/src/main/java/com/foundations/soil/ledger/LedgerMutation.java b/src/main/java/com/foundations/soil/ledger/LedgerMutation.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..e6d89a15a873a6272d67dbba50ed95666be91ed3
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/ledger/LedgerMutation.java
+@@ -0,0 +1,48 @@
++package com.foundations.soil.ledger;
++
++/** A mutation is applied only to the authenticated player's ledger, never a supplied owner UUID. */
++public record LedgerMutation(Action action, String cellKey, int fieldId, String name, String note, boolean favorite) {
++    public enum Action { SAVE_CELL, SAVE_FIELD, CREATE_FIELD, DELETE_FIELD }
++    public record Result(boolean success, String message) {}
++    public LedgerMutation {
++        if (action == null || cellKey == null || name == null || note == null || fieldId < 0
++            || cellKey.length() > 160 || name.length() > 64 || note.length() > 256)
++            throw new IllegalArgumentException("Invalid ledger mutation");
++    }
++    public Result apply(PlayerFieldLedger ledger) {
++        FieldLedgerEntry cell = cellKey.isEmpty() ? null : ledger.entry(cellKey).orElse(null);
++        FieldLedgerField field = fieldId == 0 ? null : ledger.field(fieldId).orElse(null);
++        String cleanName = LedgerText.clean(name, 64), cleanNote = LedgerText.clean(note, 256);
++        switch (action) {
++            case SAVE_CELL -> {
++                if (cell == null) return error("That cell has not been discovered in your ledger.");
++                if (fieldId != 0 && field == null) return error("That field does not exist in your ledger.");
++                cell.setFieldId(fieldId); cell.setNote(cleanNote); cell.setFavorite(favorite);
++            }
++            case SAVE_FIELD -> {
++                if (field == null) return error("That field does not exist in your ledger.");
++                if (cleanName.isBlank()) return error("A field name is required.");
++                field.setName(cleanName); field.setNote(cleanNote); field.setFavorite(favorite);
++            }
++            case CREATE_FIELD -> {
++                // Validate the entire request before assigning an ID or changing any state.
++                if (!cellKey.isEmpty() && cell == null) return error("Discover that cell before assigning it.");
++                if (cleanName.isBlank()) return error("A field name is required.");
++                if (ledger.fields().stream().anyMatch(f -> f.name().equalsIgnoreCase(cleanName)))
++                    return error("A field with that name already exists.");
++                if (ledger.fieldCount() >= PlayerFieldLedger.MAX_FIELDS) return error("The field limit has been reached.");
++                FieldLedgerField created;
++                try { created = ledger.createField(cleanName); }
++                catch (IllegalStateException exception) { return error(exception.getMessage()); }
++                created.setNote(cleanNote); created.setFavorite(favorite);
++                if (cell != null) cell.setFieldId(created.id());
++            }
++            case DELETE_FIELD -> {
++                if (field == null) return error("That field no longer exists.");
++                ledger.deleteField(fieldId);
++            }
++        }
++        return new Result(true, action == Action.DELETE_FIELD ? "Field deleted; its cells remain in your ledger." : "Saved by the server.");
++    }
++    private static Result error(String message) { return new Result(false, message); }
++}
+diff --git a/src/main/java/com/foundations/soil/ledger/LedgerText.java b/src/main/java/com/foundations/soil/ledger/LedgerText.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..062011c5272643aa8d687ee3b230014fc0dfb4e1
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/ledger/LedgerText.java
+@@ -0,0 +1,16 @@
++package com.foundations.soil.ledger;
++
++/** Shared text boundary: no controls, formatting codes, bidi overrides, or split surrogate pairs. */
++public final class LedgerText {
++    private LedgerText() {}
++    public static String clean(String value, int maxLength) {
++        if (value == null || maxLength <= 0) return "";
++        StringBuilder out = new StringBuilder();
++        value.codePoints().forEach(code -> {
++            if (out.length() + Character.charCount(code) <= maxLength && !Character.isISOControl(code)
++                && Character.getType(code) != Character.FORMAT && Character.getType(code) != Character.SURROGATE
++                && code != 0x00a7) out.appendCodePoint(code);
++        });
++        return out.toString().strip();
++    }
++}
+diff --git a/src/main/java/com/foundations/soil/ledger/PlayerFieldLedger.java b/src/main/java/com/foundations/soil/ledger/PlayerFieldLedger.java
+index 518f2bc9d6c4034d73bdc84f299615b64c3145e8..b40eebc609b7f46f3bbc91414cb23ce8f2c98537 100644
+--- a/src/main/java/com/foundations/soil/ledger/PlayerFieldLedger.java
++++ b/src/main/java/com/foundations/soil/ledger/PlayerFieldLedger.java
+@@ -14,0 +15 @@ public final class PlayerFieldLedger {
++    public static final int MAX_FIELDS = 4096;
+@@ -40,0 +42,2 @@ public final class PlayerFieldLedger {
++        if (fields.size() >= MAX_FIELDS || nextFieldId <= 0 || nextFieldId == Integer.MAX_VALUE)
++            throw new IllegalStateException("Field capacity exhausted; existing records have been preserved.");
+@@ -73 +76 @@ public final class PlayerFieldLedger {
+-        ListTag entries = tag.getList("entries", Tag.TAG_COMPOUND);
++        ListTag entries = com.foundations.soil.storage.SavedTagChecks.compounds(tag, "entries", true);
+@@ -76 +79 @@ public final class PlayerFieldLedger {
+-            ledger.entries.put(entry.key(), entry);
++            if (ledger.entries.putIfAbsent(entry.key(), entry) != null) throw new IllegalStateException("Duplicate saved ledger cell");
+@@ -78 +81 @@ public final class PlayerFieldLedger {
+-        ListTag fields = tag.getList("fields", Tag.TAG_COMPOUND);
++        ListTag fields = com.foundations.soil.storage.SavedTagChecks.compounds(tag, "fields", false);
+@@ -82 +85 @@ public final class PlayerFieldLedger {
+-            ledger.fields.put(field.id(), field);
++            if (field.id() <= 0 || ledger.fields.putIfAbsent(field.id(), field) != null) throw new IllegalStateException("Invalid or duplicate saved field ID");
+@@ -85 +88 @@ public final class PlayerFieldLedger {
+-        ledger.nextFieldId = Math.max(maxId + 1, Math.max(1, tag.getInt("next_field_id")));
++        ledger.nextFieldId = maxId == Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max(maxId + 1, Math.max(1, tag.getInt("next_field_id")));
