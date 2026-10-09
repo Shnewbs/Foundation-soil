@@ -51,7 +51,8 @@ jobs:
               assert all(n.startswith('com/foundations/soil/') for n in classes)
               assert all(struct.unpack('>H', z.read(n)[6:8])[0] == 69 for n in classes)
               assert 'com/foundations/soil/soil/SoilDoseTransaction.class' in classes
-              assert not any('Test' in n or 'ModelConfigFixture' in n for n in classes if n.startswith('com/foundations/soil/') and '/command/' not in n)
+              test_types = {p.relative_to('src/test/java').with_suffix('').as_posix() for p in pathlib.Path('src/test/java').rglob('*.java')}
+              assert all(n.removesuffix('.class').split('$')[0] not in test_types for n in classes)
           pathlib.Path('build/reports/native-test-summary.json').write_text(json.dumps({
               'version':'0.1.0-beta-port.2', 'minecraft':'26.1.2', 'java':25,
               'counts':counts, 'native_class_count':len(classes), 'new_regression_tests':19,
