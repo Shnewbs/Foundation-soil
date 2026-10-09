@@ -62,4 +62,6 @@ This requires the genuine Framework JAR at the configured `libs/<framework_jar>`
 
 ## Platform and release policy
 
-Retain 1.21.1 while developing the newer 26.3 line separately; move that newer line to 26.4 when released and compatible dependencies are validated. **This beta is 1.21.1 only; the Soil 26.3 port is pending.** Every platform release must publish its own built JAR and source on GitHub Releases. This beta uses tag `mc-1.21.1-v0.1.0-beta` and is a prerelease, not a stable/latest release.
+Retain **1.21.1**, prioritize **26.1.2** playable native integration, and develop **26.3** separately toward **26.4**. The newer-line transition does not remove the retained targets. Each actual platform release must publish its own compiled JAR and source on GitHub Releases.
+
+This `main` branch and the beta described above are **1.21.1 only**, tag `mc-1.21.1-v0.1.0-beta`. The `mc-26.1.2` branch contains the native development port targeting `0.1.0-beta-port.1`; its compilation/model tests do not establish a playable TFC/Framework runtime. The 26.3 Soil port remains separate pending work. See [platform and release policy](RELEASING.md) and each branch's validation record. Never mix or relabel binaries between platforms.
