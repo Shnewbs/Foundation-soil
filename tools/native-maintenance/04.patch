@@ -1,0 +1,195 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 2d80e215f66b7d8953e5c04af6b377444cd88847..f42e656fcc2db6d27bc59b18f75de4e810779b04 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,3 +4,3 @@
+ one-shot post-commit publication, stale-snapshot rejection and stricter malformed-save
+-headers/coordinates/measurements/field IDs. Added 19 model regression tests (93 total).
++headers/coordinates/measurements/field IDs. Added 21 model regression tests (95 total).
+ The 1.21.1 branch and assets are untouched and outside active maintenance scope.
+diff --git a/README.md b/README.md
+index 3b2227fafaa48b7570f47a7b48e47e8ec5e5a6a9..5d188e6f5502451d71749fa4542bdc445daf54f7 100644
+--- a/README.md
++++ b/README.md
+@@ -38,3 +38,3 @@ into a game's `mods` folder.
+ 
+-**93 native model tests pass**; three TFC-dependent tests are excluded from that
++**95 native model tests pass**; three TFC-dependent tests are excluded from that
+ suite and await real runtime dependencies. Model tests do not start the modpack.
+diff --git a/docs/ports/26.1.2/PORT2_RELEASE_NOTES.md b/docs/ports/26.1.2/PORT2_RELEASE_NOTES.md
+index aea3ca8eec9a5aa56342322a12365b83489e6d84..87833ebb212d49d3165799d777490aa56ca5c9c5 100644
+--- a/docs/ports/26.1.2/PORT2_RELEASE_NOTES.md
++++ b/docs/ports/26.1.2/PORT2_RELEASE_NOTES.md
+@@ -30,2 +30,9 @@ active maintenance scope; leave upstream TFC maintenance to its developers. Keep
+ 
++## Extended ordering check
++
++A 512-sequence nested two-dose regression exposed a per-dose journal ordering bug
++before publication. Doses now share one cell-resource journal; aborts restore the
++correct pre-transaction cell regardless of dose count or nesting. Journal entries
++are removed after commit/abort, and the regression checks for retained entries.
++
+ ## Executed evidence
+@@ -33,4 +40,4 @@ active maintenance scope; leave upstream TFC maintenance to its developers. Keep
+ All main/test sources compile against the genuine 26.1.2/NeoForge dependency classpath
+-with Java 25. **93 model tests passed locally**, zero failed/skipped/aborted, including
+-19 new tests for transactions and malformed saves. Three TFC-dependent checks remain
++with Java 25. **95 model tests passed locally**, zero failed/skipped/aborted, including
++21 new tests for transactions and malformed saves. Three TFC-dependent checks remain
+ outside this model suite and are not counted as successful tests. GitHub's checkpoint
+diff --git a/docs/ports/26.1.2/VALIDATION.md b/docs/ports/26.1.2/VALIDATION.md
+index 0a84bc45f6ae85e232b0ced92fa7b5799a14766f..3b065def448b833bf3083df7dcc2c450de19b4f9 100644
+--- a/docs/ports/26.1.2/VALIDATION.md
++++ b/docs/ports/26.1.2/VALIDATION.md
+@@ -3,3 +3,3 @@
+ All main/test sources compiled locally on Java 25 against the native 26.1.2 classpath.
+-**93 model tests passed** (19 new; zero failures, skips or aborts). Three TFC-dependent
++**95 model tests passed** (21 new; zero failures, skips or aborts). Three TFC-dependent
+ checks remain deferred outside this suite. The new 1k/10k/50k compressed save/load
+diff --git a/src/main/java/com/foundations/soil/soil/SoilDoseTransaction.java b/src/main/java/com/foundations/soil/soil/SoilDoseTransaction.java
+index d7a9f8fa7da74f97e6cd4d76aeb98c33ba4f445c..ca4034b6a5e4de19a501782c938b3a303b09a3bc 100644
+--- a/src/main/java/com/foundations/soil/soil/SoilDoseTransaction.java
++++ b/src/main/java/com/foundations/soil/soil/SoilDoseTransaction.java
+@@ -20,3 +20,3 @@ import net.neoforged.neoforge.transfer.transaction.TransactionContext;
+  */
+-public final class SoilDoseTransaction extends SnapshotJournal<SoilCell> {
++public final class SoilDoseTransaction {
+     public record Settings(long tick, long day, double diminishing, double strength,
+@@ -39,2 +39,3 @@ public final class SoilDoseTransaction extends SnapshotJournal<SoilCell> {
+     private SoilCell candidate;
++    private CellJournal journal;
+     private AmendmentApplicationOutcome outcome;
+@@ -58,2 +59,4 @@ public final class SoilDoseTransaction extends SnapshotJournal<SoilCell> {
+         Objects.requireNonNull(transaction, "transaction");
++        if (net.neoforged.neoforge.transfer.transaction.Transaction.getCurrentOpenedTransaction() != transaction)
++            throw new IllegalStateException("Dose must use the currently open native transaction");
+         if (world.get(key).orElse(null) != baseline || !before.equals(baseline.save()))
+@@ -66,6 +69,6 @@ public final class SoilDoseTransaction extends SnapshotJournal<SoilCell> {
+             settings.tick(), settings.day(), settings.diminishing(), settings.strength(), settings.maxPending());
+-        updateSnapshots(transaction);
+         candidate = next;
+         outcome = applied;
+-        world.put(key, next);
++        journal = world.doseJournal(key);
++        journal.stage(this, next, transaction);
+         return applied;
+@@ -73,5 +76,2 @@ public final class SoilDoseTransaction extends SnapshotJournal<SoilCell> {
+ 
+-    @Override protected SoilCell createSnapshot() { return world.get(key).orElseThrow(); }
+-    @Override protected void revertToSnapshot(SoilCell previous) { world.put(key, previous); }
+-    @Override protected void onRootCommit(SoilCell original) { committed = true; }
+     public boolean committed() { return committed; }
+@@ -80,3 +80,3 @@ public final class SoilDoseTransaction extends SnapshotJournal<SoilCell> {
+     public boolean publishCommitted() {
+-        if (!committed || isInTransaction()) throw new IllegalStateException("The root soil transfer has not committed");
++        if (!committed || journal == null || journal.isInTransaction()) throw new IllegalStateException("The root soil transfer has not committed");
+         if (notified) return false;
+@@ -91,2 +91,39 @@ public final class SoilDoseTransaction extends SnapshotJournal<SoilCell> {
+     }
++
++    /** One resource journal per world/cell: separate dose journals have unsafe rollback order. */
++    static final class CellJournal extends SnapshotJournal<CellJournal.State> {
++        record State(SoilCell cell, java.util.List<SoilDoseTransaction> pending) {}
++        private final SoilWorldData world;
++        private final SoilCellKey key;
++        private final java.util.ArrayList<SoilDoseTransaction> pending = new java.util.ArrayList<>();
++        private int retainedSnapshots;
++        CellJournal(SoilWorldData world, SoilCellKey key) { this.world = world; this.key = key; }
++        void stage(SoilDoseTransaction dose, SoilCell next, TransactionContext tx) {
++            updateSnapshots(tx);
++            world.put(key, next);
++            pending.add(dose);
++        }
++        @Override protected State createSnapshot() {
++            State snapshot = new State(world.get(key).orElseThrow(), java.util.List.copyOf(pending));
++            retainedSnapshots++;
++            return snapshot;
++        }
++        @Override protected void revertToSnapshot(State previous) {
++            world.put(key, previous.cell());
++            pending.clear(); pending.addAll(previous.pending());
++        }
++        @Override protected void onRootCommit(State original) {
++            for (SoilDoseTransaction dose : pending) dose.committed = true;
++            pending.clear();
++        }
++        @Override protected void releaseSnapshot(State released) {
++            // releaseSnapshot runs before NeoForge decrements its internal counter on abort.
++            // Count retained snapshots ourselves so aborted transfers release the map entry too.
++            if (--retainedSnapshots == 0) {
++                pending.clear();
++                world.releaseDoseJournal(key, this);
++            }
++        }
++    }
++
+ }
+diff --git a/src/main/java/com/foundations/soil/soil/SoilWorldData.java b/src/main/java/com/foundations/soil/soil/SoilWorldData.java
+index c1c890aac59804247f9e5227ebcb1f6497640ae2..71051a8a9f35cf8a53637bf894a66083cc90417b 100644
+--- a/src/main/java/com/foundations/soil/soil/SoilWorldData.java
++++ b/src/main/java/com/foundations/soil/soil/SoilWorldData.java
+@@ -18,2 +18,12 @@ public final class SoilWorldData extends com.foundations.soil.storage.SoilSavedD
+     private final Map<Long, SoilCell> cells = new HashMap<>();
++    // Only cells participating in an open transfer have a journal; never serialized.
++    private final Map<Long, SoilDoseTransaction.CellJournal> doseJournals = new HashMap<>();
++    SoilDoseTransaction.CellJournal doseJournal(SoilCellKey key) {
++        return doseJournals.computeIfAbsent(key.packed(), ignored -> new SoilDoseTransaction.CellJournal(this, key));
++    }
++    void releaseDoseJournal(SoilCellKey key, SoilDoseTransaction.CellJournal journal) {
++        doseJournals.remove(key.packed(), journal);
++    }
++    public int activeDoseJournals() { return doseJournals.size(); }
++
+ 
+ diff --git a/src/test/java/com/foundations/soil/SoilDoseTransactionTest.java b/src/test/java/com/foundations/soil/SoilDoseTransactionTest.java
+index 05a48deedcb6794d1600a0507682a05a7fb90ebe..960aef3036c20589c1d010e8976f40989835ae97 100644
+--- a/src/test/java/com/foundations/soil/SoilDoseTransactionTest.java
++++ b/src/test/java/com/foundations/soil/SoilDoseTransactionTest.java
+@@ -132,2 +132,47 @@ class SoilDoseTransactionTest {
+     }
++    @Test void sharedCellJournalHandles512NestedTwoDoseSequencesWithoutLeaking() {
++        var random = new java.util.Random(2612);
++        for (int i = 0; i < 512; i++) {
++            var w = world(); var original = w.get(KEY).orElseThrow(); var before = original.save();
++            boolean rootCommit = random.nextBoolean(), nestedCommit = random.nextBoolean();
++            int first = 10 + random.nextInt(240), second = 10 + random.nextInt(240);
++            var events = new AtomicInteger(); var d1 = prepare(w, events);
++            SoilDoseTransaction d2;
++            try (var root = Transaction.openRoot()) {
++                d1.stage(first, AmendmentDoseUnit.MILLIBUCKET, 1, root);
++                d2 = prepare(w, events);
++                try (var nested = Transaction.open(root)) {
++                    d2.stage(second, AmendmentDoseUnit.MILLIBUCKET, 1, nested);
++                    if (nestedCommit) nested.commit();
++                }
++                assertEquals(1, w.activeDoseJournals());
++                if (rootCommit) root.commit();
++            }
++            var expected = SoilCell.load(before.copy());
++            if (rootCommit) {
++                expected.applyDose(Amendments.COMPOST_TEA, first, AmendmentDoseUnit.MILLIBUCKET, 1, 100, 10, .22, 1, 32);
++                if (nestedCommit) expected.applyDose(Amendments.COMPOST_TEA, second, AmendmentDoseUnit.MILLIBUCKET, 1, 100, 10, .22, 1, 32);
++                assertTrue(d1.publishCommitted());
++                if (nestedCommit) assertTrue(d2.publishCommitted());
++            }
++            assertEquals(rootCommit, d1.committed());
++            assertEquals(rootCommit && nestedCommit, d2.committed());
++            assertEquals(expected.save(), w.get(KEY).orElseThrow().save(), "Sequence " + i);
++            assertEquals(before, original.save());
++            assertEquals(0, w.activeDoseJournals());
++            assertEquals(rootCommit ? nestedCommit ? 2 : 1 : 0, events.get());
++        }
++    }
++    @Test void abortedNestedJournalIsReleasedBeforeLaterUseInTheSameRoot() {
++        var w = world(); var before = w.get(KEY).orElseThrow(); var events = new AtomicInteger();
++        var abandoned = prepare(w, events);
++        try (var root = Transaction.openRoot()) {
++            try (var nested = Transaction.open(root)) { stage(abandoned, nested); }
++            assertEquals(0, w.activeDoseJournals()); assertSame(before, w.get(KEY).orElseThrow());
++            var later = prepare(w, events); stage(later, root);
++        }
++        assertEquals(0, w.activeDoseJournals()); assertSame(before, w.get(KEY).orElseThrow());
++        assertFalse(abandoned.committed()); assertEquals(0, events.get());
++    }
++
+ }
