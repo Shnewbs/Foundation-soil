@@ -141,7 +141,7 @@ index c1c890aac59804247f9e5227ebcb1f6497640ae2..71051a8a9f35cf8a53637bf894a66083
 +    public int activeDoseJournals() { return doseJournals.size(); }
 +
  
- diff --git a/src/test/java/com/foundations/soil/SoilDoseTransactionTest.java b/src/test/java/com/foundations/soil/SoilDoseTransactionTest.java
+diff --git a/src/test/java/com/foundations/soil/SoilDoseTransactionTest.java b/src/test/java/com/foundations/soil/SoilDoseTransactionTest.java
 index 05a48deedcb6794d1600a0507682a05a7fb90ebe..960aef3036c20589c1d010e8976f40989835ae97 100644
 --- a/src/test/java/com/foundations/soil/SoilDoseTransactionTest.java
 +++ b/src/test/java/com/foundations/soil/SoilDoseTransactionTest.java
