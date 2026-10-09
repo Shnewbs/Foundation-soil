@@ -2,38 +2,30 @@
 
 ## Supported development policy
 
-- Maintain Minecraft **1.21.1** alongside the newer platform.
-- Port the newer line to **26.3**, then move that line to **26.4** as soon as the Minecraft release is available. Keep 1.21.1 active.
-- Verify compatible NeoForge, TerraFirmaCraft, and Foundations Framework builds before publishing a port. Record dependency blockers; never label a 1.21.1 binary as 26.3/26.4.
-- Current source on `main` is 1.21.1 only. The 26.3 implementation is still pending.
-- Use `mc-26.3` for the newer source line once porting starts, and `mc-26.4` when it moves forward. Retain previous release tags/assets.
-- Keep each platform's Minecraft/NeoForge/TFC/Framework/Java versions in that branch's build configuration. Share features and fixes across both active lines.
+- Retain Minecraft **1.21.1** on `main`; the existing `0.1.0-beta` release remains unchanged.
+- Prioritize **26.1.2** native gameplay integration on `mc-26.1.2`. Its source is ported against Java 25 / NeoForge 26.1.2.114; compiled-development status is distinct from playable status.
+- Develop **26.3** separately toward **26.4**. Moving that newer line forward does not remove 1.21.1 or 26.1.2 from the plan.
+- TFC and Foundations Framework remain hard runtime dependencies. Verify genuine matching builds, required APIs, client/dedicated-server launches and migration before declaring a port playable.
+- A native `-port.N` development prerelease may contain a compiled JAR while runtime dependencies remain unvalidated, but release notes must prominently explain those blockers. Never present it as production-ready or rename a legacy JAR.
+- Use `mc-26.3` / `mc-26.4` for those source lines when implemented. Retain previous tags/assets and share fixes deliberately across platform APIs.
 
 ## Every release is a GitHub Release
 
-Use platform-specific tags, created on the tested matching source commit:
+Use tags matching the platform and mod version in the exact source commit:
 
-```text
-mc-1.21.1-v0.0.3a.R7
-mc-26.3-v0.0.3a.R7
-mc-26.4-v0.1.0
+```
+mc-1.21.1-v0.1.0-beta
+mc-26.1.2-v0.1.0-beta-port.1
 ```
 
-These are naming examples, not existing releases or compatibility claims.
+The first identifies the retained published beta. The second is the native development-port target; consult GitHub Releases for publication status. It does not imply a completed TFC/Framework runtime validation.
 
-The `Publish GitHub Release` workflow validates tag/platform/version agreement, selects the configured Java version, and runs `clean test build`. Only after success does it create a draft, attach JARs, and publish it. Failed uploads leave a draft rather than publishing an empty release. Already-published versions require a new tag/version.
+Each release must attach the compiled JAR, source, validation notes and checksums. Native compilation/model-test evidence must not be described as a successful game launch. The native development pipeline checks Java classfile/platform versions, required dependency metadata, test counts and source identity before publication.
 
-JAR names include both platform and mod version:
+Publish through a draft so upload failures cannot leave an empty release. Already-published versions require new tags/assets rather than replacement. Prereleases must not become stable/latest. CI artifacts alone do not replace GitHub Releases.
 
-```text
-foundations_soil-1.21.1-0.0.3a.R7.jar
-foundations_soil-26.3-0.0.3a.R7.jar
-```
+For playable beta/stable approval, complete the corresponding in-game, multiplayer, migration and long-running-world gates. The current native port's evidence and remaining work are recorded on its branch under `docs/ports/26.1.2/`.
 
-Alpha/beta/RC version labels create GitHub prereleases; plain numeric versions create normal releases. If the roadmap's 0.1.0 beta is shipped before stable approval, use a beta-qualified mod version such as `0.1.0-beta.1` in source and tag. Each active platform needs its own tested release and assets. CI artifacts alone do not count as releases.
+## 26.4 transition
 
-Before tagging, complete the applicable runtime/migration gates, add changelog notes, and confirm that Actions is enabled. This setup has not yet produced a release in this repository.
-
-## 26.4 tracking
-
-A daily ChatGPT release watch checks official Minecraft/NeoForge availability and reports relevant dependency readiness. On confirmed 26.4 release, start the newer-line migration immediately while retaining the 1.21.1 line. Publish the 26.4 build only after its required dependencies and tests pass.
+Confirm official Minecraft/NeoForge availability and dependency readiness before moving the newer line. Keep the retained lines active and publish only correctly labeled, platform-specific artifacts. This document records the policy, not evidence that any background watcher or 26.4 compatibility has been verified.
