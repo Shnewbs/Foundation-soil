@@ -1,0 +1,593 @@
+diff --git a/src/main/java/com/foundations/soil/soil/SoilTrend.java b/src/main/java/com/foundations/soil/soil/SoilTrend.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..13dd4d0b8b948ae7a4977c082d660595ddd3c5ae
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/soil/SoilTrend.java
+@@ -0,0 +1,58 @@
++package com.foundations.soil.soil;
++
++import java.util.ArrayList;
++import java.util.List;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.nbt.ListTag;
++import net.minecraft.nbt.Tag;
++
++/** At most sixteen observed TFC-day endpoints. Gaps are not fabricated as daily observations. */
++public final class SoilTrend {
++    public static final int CAPACITY = 16;
++    public record Point(long day, SoilProfile profile, double cropPressure) {
++        public Point {
++            if (day < 0 || profile == null || !Double.isFinite(cropPressure) || cropPressure < 0 || cropPressure > 1)
++                throw new IllegalArgumentException("Invalid soil trend sample");
++        }
++    }
++    private final ArrayList<Point> points = new ArrayList<>(CAPACITY);
++    public List<Point> points() { return List.copyOf(points); }
++    public void clear() { points.clear(); }
++    public void record(long day, SoilProfile profile, double cropPressure) {
++        Point point = new Point(day, profile, cropPressure);
++        if (!points.isEmpty()) {
++            long previous = points.getLast().day();
++            if (day < previous) return;
++            if (day == previous) { points.set(points.size() - 1, point); return; }
++        }
++        if (points.size() == CAPACITY) points.removeFirst();
++        points.add(point);
++    }
++    public ListTag save() {
++        ListTag list = new ListTag();
++        for (Point point : points) {
++            CompoundTag tag = new CompoundTag();
++            SoilProfile p = point.profile();
++            tag.putLong("day", point.day());
++            tag.putDouble("om", p.organicMatter()); tag.putDouble("ph", p.pH());
++            tag.putDouble("dr", p.drainage()); tag.putDouble("cp", p.compaction());
++            tag.putDouble("st", p.structure()); tag.putDouble("bio", p.biology());
++            tag.putDouble("sal", p.salinity()); tag.putDouble("pressure", point.cropPressure());
++            list.add(tag);
++        }
++        return list;
++    }
++    public void load(ListTag list) {
++        if (list.size() > CAPACITY) throw new IllegalStateException("Oversized soil trend history");
++        clear();
++        long previous = -1;
++        for (Tag value : list) {
++            CompoundTag tag = (CompoundTag) value;
++            long day = tag.getLong("day");
++            if (day <= previous) throw new IllegalStateException("Unordered soil trend history");
++            record(day, new SoilProfile(tag.getDouble("om"), tag.getDouble("ph"), tag.getDouble("dr"),
++                tag.getDouble("cp"), tag.getDouble("st"), tag.getDouble("bio"), tag.getDouble("sal")), tag.getDouble("pressure"));
++            previous = day;
++        }
++    }
++}
+diff --git a/src/main/java/com/foundations/soil/soil/SoilWorldData.java b/src/main/java/com/foundations/soil/soil/SoilWorldData.java
+index 055ef5fa14639e7d0d42e19373547150b2f552cc..bdba454d5f339eb4067cdba7511cf4483b271b87 100644
+--- a/src/main/java/com/foundations/soil/soil/SoilWorldData.java
++++ b/src/main/java/com/foundations/soil/soil/SoilWorldData.java
+@@ -33 +33 @@ public final class SoilWorldData extends SavedData {
+-        ListTag list = root.getList("cells", Tag.TAG_COMPOUND);
++        ListTag list = com.foundations.soil.storage.SavedTagChecks.compounds(root, "cells", true);
+@@ -36 +36,2 @@ public final class SoilWorldData extends SavedData {
+-            data.cells.put(new SoilCellKey(cell.cellX(), cell.cellZ()).packed(), cell);
++            if (data.cells.putIfAbsent(new SoilCellKey(cell.cellX(), cell.cellZ()).packed(), cell) != null)
++                throw new IllegalStateException("Duplicate persisted Soil Cell; refusing to overwrite history");
+diff --git a/src/main/java/com/foundations/soil/storage/SafeSavedData.java b/src/main/java/com/foundations/soil/storage/SafeSavedData.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..c263e64b8ce1489910e28614c216ef4b5f8eed45
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/storage/SafeSavedData.java
+@@ -0,0 +1,34 @@
++package com.foundations.soil.storage;
++
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.function.BiFunction;
++import java.util.function.Supplier;
++import net.minecraft.core.HolderLookup;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.server.level.ServerLevel;
++import net.minecraft.world.level.dimension.DimensionType;
++import net.minecraft.world.level.saveddata.SavedData;
++import net.minecraft.world.level.storage.LevelResource;
++
++/** Minecraft catches deserializer exceptions. Never let its fallback replace an existing file. */
++public final class SafeSavedData {
++    private SafeSavedData() {}
++    public static <T extends SavedData> T get(ServerLevel level, String name, Supplier<T> create,
++            BiFunction<CompoundTag, HolderLookup.Provider, T> load) {
++        if (!level.getServer().isSameThread()) throw new IllegalStateException("Saved data requires the server thread");
++        Path file = DimensionType.getStorageFolder(level.dimension(), level.getServer().getWorldPath(LevelResource.ROOT))
++            .resolve("data").resolve(name + ".dat");
++        return level.getDataStorage().computeIfAbsent(factory(file, create, load), name);
++    }
++    public static <T extends SavedData> SavedData.Factory<T> factory(Path file, Supplier<T> create,
++            BiFunction<CompoundTag, HolderLookup.Provider, T> load) {
++        return new SavedData.Factory<>(() -> {
++            // notExists is false for an inaccessible file too: fail closed in that case.
++            if (!Files.notExists(file)) throw new IllegalStateException(
++                "Refusing to replace unreadable Foundations saved data: " + file
++                + ". Stop the server and restore a backup or repair the original; no empty replacement was created.");
++            return create.get();
++        }, load);
++    }
++}
+diff --git a/src/main/java/com/foundations/soil/storage/SavedTagChecks.java b/src/main/java/com/foundations/soil/storage/SavedTagChecks.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0ba5633156dbfef4cc3d7b94de38b86ef8938302
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/storage/SavedTagChecks.java
+@@ -0,0 +1,16 @@
++package com.foundations.soil.storage;
++
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.nbt.ListTag;
++import net.minecraft.nbt.Tag;
++
++public final class SavedTagChecks {
++    private SavedTagChecks() {}
++    public static ListTag compounds(CompoundTag root, String key, boolean required) {
++        Tag value = root.get(key);
++        if (value == null && !required) return new ListTag();
++        if (!(value instanceof ListTag list) || (!list.isEmpty() && list.getElementType() != Tag.TAG_COMPOUND))
++            throw new IllegalStateException("Malformed or missing saved collection: " + key);
++        return list;
++    }
++}
+diff --git a/src/main/resources/assets/foundations_soil/blockstates/soil_laboratory.json b/src/main/resources/assets/foundations_soil/blockstates/soil_laboratory.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..55047e4ed13bbca0bdb45dc14b4cb15d6380a9c3
+--- /dev/null
++++ b/src/main/resources/assets/foundations_soil/blockstates/soil_laboratory.json
+@@ -0,0 +1,7 @@
++{
++  "variants": {
++    "": {
++      "model": "foundations_soil:block/soil_laboratory"
++    }
++  }
++}
+diff --git a/src/main/resources/assets/foundations_soil/lang/en_us.json b/src/main/resources/assets/foundations_soil/lang/en_us.json
+index 37d47bc41e709a3784456c008de5f11be8176603..0a7e3f112b962854b967f6615171ec8fa5cbbfda 100644
+--- a/src/main/resources/assets/foundations_soil/lang/en_us.json
++++ b/src/main/resources/assets/foundations_soil/lang/en_us.json
+@@ -29 +29,3 @@
+-  "block.foundations_soil.biochar_suspension": "Biochar Suspension"
++  "block.foundations_soil.biochar_suspension": "Biochar Suspension",
++  "block.foundations_soil.soil_laboratory": "Soil Laboratory",
++  "screen.foundations_soil.laboratory": "Soil Laboratory"
+diff --git a/src/main/resources/assets/foundations_soil/models/block/soil_laboratory.json b/src/main/resources/assets/foundations_soil/models/block/soil_laboratory.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ec86b0d81beca503585a8e9e275508667997e08
+--- /dev/null
++++ b/src/main/resources/assets/foundations_soil/models/block/soil_laboratory.json
+@@ -0,0 +1,237 @@
++{
++  "parent": "minecraft:block/block",
++  "textures": {
++    "particle": "minecraft:block/smooth_stone",
++    "wood": "minecraft:block/dark_oak_planks",
++    "top": "minecraft:block/smooth_stone",
++    "metal": "minecraft:block/iron_block",
++    "glass": "minecraft:block/glass",
++    "paper": "minecraft:block/white_wool"
++  },
++  "elements": [
++    {
++      "from": [
++        1,
++        0,
++        1
++      ],
++      "to": [
++        15,
++        10,
++        15
++      ],
++      "faces": {
++        "north": {
++          "texture": "#wood"
++        },
++        "south": {
++          "texture": "#wood"
++        },
++        "east": {
++          "texture": "#wood"
++        },
++        "west": {
++          "texture": "#wood"
++        },
++        "up": {
++          "texture": "#wood"
++        },
++        "down": {
++          "texture": "#wood"
++        }
++      }
++    },
++    {
++      "from": [
++        0,
++        10,
++        0
++      ],
++      "to": [
++        16,
++        12,
++        16
++      ],
++      "faces": {
++        "north": {
++          "texture": "#top"
++        },
++        "south": {
++          "texture": "#top"
++        },
++        "east": {
++          "texture": "#top"
++        },
++        "west": {
++          "texture": "#top"
++        },
++        "up": {
++          "texture": "#top"
++        },
++        "down": {
++          "texture": "#top"
++        }
++      }
++    },
++    {
++      "from": [
++        2,
++        12,
++        3
++      ],
++      "to": [
++        7,
++        12.25,
++        11
++      ],
++      "faces": {
++        "north": {
++          "texture": "#paper"
++        },
++        "south": {
++          "texture": "#paper"
++        },
++        "east": {
++          "texture": "#paper"
++        },
++        "west": {
++          "texture": "#paper"
++        },
++        "up": {
++          "texture": "#paper"
++        },
++        "down": {
++          "texture": "#paper"
++        }
++      }
++    },
++    {
++      "from": [
++        10,
++        12,
++        3
++      ],
++      "to": [
++        14,
++        13,
++        7
++      ],
++      "faces": {
++        "north": {
++          "texture": "#metal"
++        },
++        "south": {
++          "texture": "#metal"
++        },
++        "east": {
++          "texture": "#metal"
++        },
++        "west": {
++          "texture": "#metal"
++        },
++        "up": {
++          "texture": "#metal"
++        },
++        "down": {
++          "texture": "#metal"
++        }
++      }
++    },
++    {
++      "from": [
++        10.5,
++        13,
++        3.5
++      ],
++      "to": [
++        13.5,
++        16,
++        6.5
++      ],
++      "faces": {
++        "north": {
++          "texture": "#glass"
++        },
++        "south": {
++          "texture": "#glass"
++        },
++        "east": {
++          "texture": "#glass"
++        },
++        "west": {
++          "texture": "#glass"
++        },
++        "up": {
++          "texture": "#glass"
++        },
++        "down": {
++          "texture": "#glass"
++        }
++      }
++    },
++    {
++      "from": [
++        3,
++        4,
++        0.75
++      ],
++      "to": [
++        13,
++        4.5,
++        1.25
++      ],
++      "faces": {
++        "north": {
++          "texture": "#metal"
++        },
++        "south": {
++          "texture": "#metal"
++        },
++        "east": {
++          "texture": "#metal"
++        },
++        "west": {
++          "texture": "#metal"
++        },
++        "up": {
++          "texture": "#metal"
++        },
++        "down": {
++          "texture": "#metal"
++        }
++      }
++    },
++    {
++      "from": [
++        3,
++        8,
++        0.75
++      ],
++      "to": [
++        13,
++        8.5,
++        1.25
++      ],
++      "faces": {
++        "north": {
++          "texture": "#metal"
++        },
++        "south": {
++          "texture": "#metal"
++        },
++        "east": {
++          "texture": "#metal"
++        },
++        "west": {
++          "texture": "#metal"
++        },
++        "up": {
++          "texture": "#metal"
++        },
++        "down": {
++          "texture": "#metal"
++        }
++      }
++    }
++  ]
++}
+diff --git a/src/main/resources/assets/foundations_soil/models/item/soil_laboratory.json b/src/main/resources/assets/foundations_soil/models/item/soil_laboratory.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..c4913741e09aa21b18efd86aa4bf9fccfb9a9d6c
+--- /dev/null
++++ b/src/main/resources/assets/foundations_soil/models/item/soil_laboratory.json
+@@ -0,0 +1,3 @@
++{
++  "parent": "foundations_soil:block/soil_laboratory"
++}
+diff --git a/src/main/resources/data/foundations_soil/loot_table/blocks/soil_laboratory.json b/src/main/resources/data/foundations_soil/loot_table/blocks/soil_laboratory.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..71d7706fffcfa4ac4866017237fc8b4a2a1564dc
+--- /dev/null
++++ b/src/main/resources/data/foundations_soil/loot_table/blocks/soil_laboratory.json
+@@ -0,0 +1,19 @@
++{
++  "type": "minecraft:block",
++  "pools": [
++    {
++      "rolls": 1,
++      "entries": [
++        {
++          "type": "minecraft:item",
++          "name": "foundations_soil:soil_laboratory"
++        }
++      ],
++      "conditions": [
++        {
++          "condition": "minecraft:survives_explosion"
++        }
++      ]
++    }
++  ]
++}
+diff --git a/src/main/resources/data/foundations_soil/recipe/soil_laboratory.json b/src/main/resources/data/foundations_soil/recipe/soil_laboratory.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..b195bbc341a139ac68d2409cdef12e1e5edda8f7
+--- /dev/null
++++ b/src/main/resources/data/foundations_soil/recipe/soil_laboratory.json
+@@ -0,0 +1,27 @@
++{
++  "type": "minecraft:crafting_shaped",
++  "category": "misc",
++  "pattern": [
++    "GGG",
++    "PHP",
++    "BBB"
++  ],
++  "key": {
++    "G": {
++      "item": "minecraft:glass"
++    },
++    "P": {
++      "tag": "minecraft:planks"
++    },
++    "H": {
++      "item": "foundations_soil:soil_probe"
++    },
++    "B": {
++      "item": "tfc:metal/ingot/brass"
++    }
++  },
++  "result": {
++    "id": "foundations_soil:soil_laboratory",
++    "count": 1
++  }
++}
+diff --git a/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json b/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ba19d9c052a5b343465ec18ef90ae9c26ef31d4e
+--- /dev/null
++++ b/src/main/resources/data/minecraft/tags/block/mineable/pickaxe.json
+@@ -0,0 +1,6 @@
++{
++  "replace": false,
++  "values": [
++    "foundations_soil:soil_laboratory"
++  ]
++}
+diff --git a/src/main/resources/foundations_soil.mixins.json b/src/main/resources/foundations_soil.mixins.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..7a1b9a51f10fe425f8933f7ba1dad5b1b64bcf64
+--- /dev/null
++++ b/src/main/resources/foundations_soil.mixins.json
+@@ -0,0 +1,13 @@
++{
++  "required": true,
++  "minVersion": "0.8",
++  "package": "com.foundations.soil.mixin",
++  "compatibilityLevel": "JAVA_21",
++  "mixins": [
++    "TfcCropYieldMixin",
++    "TfcPickingHarvestMixin"
++  ],
++  "injectors": {
++    "defaultRequire": 1
++  }
++}
+diff --git a/src/test/java/com/foundations/soil/BetaBoundsTest.java b/src/test/java/com/foundations/soil/BetaBoundsTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..a0522f239d0110ee78298e3bbdf06d4f33586385
+--- /dev/null
++++ b/src/test/java/com/foundations/soil/BetaBoundsTest.java
+@@ -0,0 +1,28 @@
++package com.foundations.soil;
++import static org.junit.jupiter.api.Assertions.*;
++import com.foundations.soil.client.DetailScroll;
++import com.foundations.soil.network.*;
++import java.util.UUID;
++import org.junit.jupiter.api.Test;
++class BetaBoundsTest {
++    @Test void packetCountsRejectRatherThanTruncateAndDesynchronize() {
++        assertThrows(IllegalArgumentException.class,()->NetworkBounds.count(-1,64));
++        assertThrows(IllegalArgumentException.class,()->NetworkBounds.count(65,64));
++        assertEquals(64,NetworkBounds.count(64,64));
++    }
++    @Test void paginationIncludesPartialLastPageAndCanReturnToPreviousBatch() {
++        assertEquals(128,NetworkBounds.pageOffset(100000,137,64));
++        assertEquals(64,NetworkBounds.pageOffset(127,137,64));
++        assertEquals(0,NetworkBounds.pageOffset(0,0,64));
++    }
++    @Test void replayGuardDoesNotConfuseReadHudAndMutationCooldowns() {
++        RequestWindow w=new RequestWindow();UUID id=UUID.randomUUID();
++        assertTrue(w.edit(id,10));assertFalse(w.edit(id,40));assertFalse(w.edit(UUID.randomUUID(),19));
++        assertTrue(w.read(10));assertTrue(w.hud(10));assertFalse(w.read(11));assertFalse(w.hud(11));assertTrue(w.hud(14));assertTrue(w.edit(UUID.randomUUID(),20));
++    }
++    @Test void detailScrollingHandlesResizeSelectionChangesAndNonFiniteInput() {
++        DetailScroll s=new DetailScroll();s.layout("A",1000,100);s.scroll(100000);assertEquals(900,s.offset());
++        s.layout("A",400,100);assertEquals(300,s.offset());s.layout("B",400,100);assertEquals(0,s.offset());
++        s.drag(1000);assertEquals(300,s.offset());s.set(Double.NaN);assertEquals(0,s.offset());
++    }
++}
+diff --git a/src/test/java/com/foundations/soil/LaboratoryReportsTest.java b/src/test/java/com/foundations/soil/LaboratoryReportsTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..10e191ce923e52c1bed99fe08fadf446900a2c9e
+--- /dev/null
++++ b/src/test/java/com/foundations/soil/LaboratoryReportsTest.java
+@@ -0,0 +1,23 @@
++package com.foundations.soil;
++import static org.junit.jupiter.api.Assertions.*;
++import com.foundations.soil.ledger.*;
++import com.foundations.soil.soil.*;
++import org.junit.jupiter.api.Test;
++class LaboratoryReportsTest {
++    @Test void reportsUseAllMembersNotOnlyThe64CellNetworkPage() {
++        var ledger=new PlayerFieldLedger();var field=ledger.createField("Field trial");
++        for(int i=0;i<150;i++) {
++            var e=ledger.discover("minecraft:overworld",i,0,64,1);e.setFieldId(field.id());
++            SoilCell c=new SoilCell(i,0,64,new SoilProfile(.4,6.5,.5,.1,.6,.6,.05),1,30);
++            c.initializePhysical(SoilTexture.LOAM,"loam");c.enableMonitoring();e.refresh(c, 1, 30);
++        }
++        var report=SoilLaboratoryReports.describe(ledger,new LaboratorySelection(true,"",field.id()));
++        assertTrue(report.stream().anyMatch(s->s.contains("150 discovered cells")));assertTrue(report.size()<96);
++    }
++    @Test void unknownOwnershipAndLegacyProbeDatesAreExplicit() {
++        var ledger=new PlayerFieldLedger();var e=ledger.discover("minecraft:overworld",0,0,64,1);
++        var report=SoilLaboratoryReports.describe(ledger,new LaboratorySelection(false,e.key(),0));
++        assertTrue(report.stream().anyMatch(s->s.toLowerCase().contains("unknown")||s.toLowerCase().contains("not probed")));
++        assertTrue(SoilLaboratoryReports.describe(new PlayerFieldLedger(),new LaboratorySelection(false,e.key(),0)).stream().anyMatch(s->s.contains("your")));
++    }
++}
+diff --git a/src/test/java/com/foundations/soil/LaboratoryResourcesTest.java b/src/test/java/com/foundations/soil/LaboratoryResourcesTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1ecacb6470087187caac8f3c25cb6a501ca985a1
+--- /dev/null
++++ b/src/test/java/com/foundations/soil/LaboratoryResourcesTest.java
+@@ -0,0 +1,24 @@
++package com.foundations.soil;
++
++import static org.junit.jupiter.api.Assertions.*;
++import com.google.gson.JsonParser;
++import java.io.InputStreamReader;
++import java.nio.charset.StandardCharsets;
++import org.junit.jupiter.api.Test;
++
++class LaboratoryResourcesTest {
++    @Test void laboratoryHasRecipeLootModelsAndPinnedTfcIngredients() throws Exception {
++        for(String path:new String[]{"/assets/foundations_soil/blockstates/soil_laboratory.json",
++            "/assets/foundations_soil/models/block/soil_laboratory.json","/assets/foundations_soil/models/item/soil_laboratory.json",
++            "/data/foundations_soil/loot_table/blocks/soil_laboratory.json","/data/foundations_soil/recipe/soil_laboratory.json",
++            "/assets/tfc/models/item/metal/ingot/brass.json"}) {
++            try(var input=getClass().getResourceAsStream(path)) {
++                assertNotNull(input,path);assertTrue(JsonParser.parseReader(new InputStreamReader(input,StandardCharsets.UTF_8)).isJsonObject(),path);
++            }
++        }
++        try(var input=getClass().getResourceAsStream("/data/tfc/recipe/glassworking/glass.json")) {
++            assertNotNull(input);var recipe=JsonParser.parseReader(new InputStreamReader(input,StandardCharsets.UTF_8)).getAsJsonObject();
++            assertEquals("minecraft:glass",recipe.getAsJsonObject("result").get("id").getAsString());
++        }
++    }
++}
