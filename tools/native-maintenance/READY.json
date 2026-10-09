@@ -1,0 +1,10 @@
+{
+  "baseline": "c194eb4e83263596c82a46a3320a12f602c52acd",
+  "version": "0.1.0-beta-port.2",
+  "files": 19,
+  "parts": {
+    "01.patch": "299869d88f90b01fba60fb4be382484e6b6821f2018fc072d429c59963981413",
+    "02.patch": "8d1648ace9c6efa34d1de40dee47fbdfea0c685c139e04e0a605c78ea6da07ea",
+    "03.patch": "4649ead85b1ce720fd3bd5f9807d0844f83ef1278fd5c69ecdaf5ba270b40d0c"
+  }
+}
