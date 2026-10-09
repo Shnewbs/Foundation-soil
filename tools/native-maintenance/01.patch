@@ -1,0 +1,258 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 52ec6cbfbf56de793457439adc3dd73f90cc05c5..2d80e215f66b7d8953e5c04af6b377444cd88847 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1 +1,11 @@
++# 0.1.0-beta-port.2 — native transaction and save hardening
++
++26.1.2 only. Added shared fluid/soil transaction rollback, creative extraction probes,
++one-shot post-commit publication, stale-snapshot rejection and stricter malformed-save
++headers/coordinates/measurements/field IDs. Added 19 model regression tests (93 total).
++The 1.21.1 branch and assets are untouched and outside active maintenance scope.
++See [complete notes and limits](docs/ports/26.1.2/PORT2_RELEASE_NOTES.md).
++
++---
++
+ # 0.1.0-beta-port.1 — Minecraft 26.1.2
+diff --git a/README.md b/README.md
+index a7d05600920efe13c297a73ab2ee9fd0c9e2cab5..3b2227fafaa48b7570f47a7b48e47e8ec5e5a6a9 100644
+--- a/README.md
++++ b/README.md
+@@ -2,3 +2,3 @@
+ 
+-**`0.1.0-beta-port.1` · Minecraft 26.1.2 · NeoForge 26.1.2.114 · Java 25**
++**`0.1.0-beta-port.2` · Minecraft 26.1.2 · NeoForge 26.1.2.114 · Java 25**
+ 
+@@ -9,2 +9,8 @@ TFC and Foundations Framework remain hard runtime dependencies. Their native
+ 
++## Latest native checkpoint
++
++Port.2 adds reversible liquid/soil dosing on the same NeoForge transaction,
++post-commit-only notifications, stale-snapshot rejection, and stricter corrupt-save
++validation. See [port.2 notes and exact limits](docs/ports/26.1.2/PORT2_RELEASE_NOTES.md).
++
+ ## Included
+@@ -27,3 +33,3 @@ requires network access. The main output is:
+ 
+-`build/libs/foundations_soil-26.1.2-0.1.0-beta-port.1.jar`
++`build/libs/foundations_soil-26.1.2-0.1.0-beta-port.2.jar`
+ 
+@@ -32,3 +38,3 @@ into a game's `mods` folder.
+ 
+-**74 native model tests pass**; three TFC-dependent tests are excluded from that
++**93 native model tests pass**; three TFC-dependent tests are excluded from that
+ suite and await real runtime dependencies. Model tests do not start the modpack.
+@@ -51,3 +57,3 @@ are included. Patchouli/JEI runtime pins follow the inspected target TFC branch.
+ Read [the exact evidence and open gates](docs/ports/26.1.2/VALIDATION.md) and
+-[release notes](docs/ports/26.1.2/RELEASE_NOTES.md). Full game launches, actual TFC API
++[current release notes](docs/ports/26.1.2/PORT2_RELEASE_NOTES.md). Full game launches, actual TFC API
+ binding/Mixins, crop/fluids, rendering/input, multiplayer and seasonal tests remain
+@@ -62,3 +68,3 @@ network protocol remains 8 within the strictly matching native platform.
+ 
+-- `main`: retain Minecraft **1.21.1**, published `0.1.0-beta`.
++- `main`: frozen **1.21.1** reference; outside our active maintenance scope. Do not modify it.
+ - `mc-26.1.2`: this native development port; next playable integration target.
+@@ -67,3 +73,3 @@ network protocol remains 8 within the strictly matching native platform.
+ Publish each platform's own JAR and source as a GitHub Release. This port uses
+-`mc-26.1.2-v0.1.0-beta-port.1`, a development prerelease, never the stable/latest build.
++`mc-26.1.2-v0.1.0-beta-port.2`, a development prerelease, never the stable/latest build.
+ Earlier `docs/beta/` validation records describe **1.21.1**, not native 26.x acceptance.
+diff --git a/RELEASING.md b/RELEASING.md
+index 7b0e2f02b8855935773ceb1ff708d76e90b133ed..7cbe44e82226457ee005723f399e33f078ab9393 100644
+--- a/RELEASING.md
++++ b/RELEASING.md
+@@ -1,48 +1,32 @@
+-# Platforms and GitHub Releases
++# Native platform scope and GitHub Releases
+ 
+-## Active policy
++## Scope decision — 2026-10-09
+ 
+-Retain **1.21.1** and target **26.1.2** for the next playable native integration.
+-Develop **26.3** separately toward **26.4**. The 26.3-to-26.4 transition does not
+-remove the retained 1.21.1 or 26.1.2 targets. Required dependencies and runtime
+-validation determine playable readiness; a version number change does not.
++**Do not touch 1.21.1.** Upstream TFC maintenance stays with its developers.
++The existing Soil `main` branch and 1.21.1 assets remain unchanged historical
++references, not a branch to keep updating or backport into.
+ 
+-| Branch | Role |
+-| --- | --- |
+-| main | 1.21.1 retained line; 0.1.0-beta released |
+-| mc-26.1.2 | Native port; compiled development release with runtime gates open |
+-| mc-26.3 | Planned separate source port toward 26.4 |
+-| mc-26.4 | Start when the target release and usable dependencies are verified |
++Our active immediate target is **26.1.2** on `mc-26.1.2`. Keep **26.3 → 26.4**
++as the separate forward-port track. This checkpoint implements only 26.1.2 changes.
++No default-branch change, deletion, force-push or old-release replacement is authorized
++by this scope change.
+ 
+-Do not silently drop required TFC/Framework dependencies or rename a legacy JAR.
+-Each branch pins Minecraft, NeoForge, Java and its runtime dependency versions.
+-Share agronomy fixes deliberately; platform APIs require separate compilation.
++## Release rules
+ 
+-## Releases
++Every delivered native version gets its own GitHub prerelease with the compiled JAR,
++sources JAR, full source ZIP, test reports, validation notes and SHA-256 checksums.
++Match the platform, mod version, source commit and classfile Java version before
++publishing. Build and test before committing the verified implementation and
++publishing its tag. Publish through a draft, never overwrite an existing release,
++and never promote development ports to stable/latest.
+ 
+-Use a platform-specific tag matching the exact source version:
++Current checkpoint tag: `mc-26.1.2-v0.1.0-beta-port.2`.
++Native compilation/model tests are separate from required TFC/Framework game startup.
++Do not drop hard dependencies or claim playability while those gates remain open.
++CI artifacts alone do not replace GitHub Releases.
+ 
+-```
+-mc-1.21.1-v0.1.0-beta
+-mc-26.1.2-v0.1.0-beta-port.1
+-```
++## Forward targets
+ 
+-The first is the retained beta; the second identifies this native development port.
+-A `-port.N` prerelease is not a claim of completed runtime validation. Release notes
+-must prominently identify missing required dependencies and unexecuted game tests.
+-A normal playable beta/stable release requires the corresponding runtime gates.
+-
+-Every actual release publishes the matching compiled JAR, sources, complete source
+-archive, validation notes, and checksums. Build the tagged source and check version,
+-Minecraft range and Java classfile level. Publish through a draft so an upload
+-failure cannot leave an empty public release. Never overwrite published assets;
+-use a new version/tag for changes. Prereleases must not become the stable/latest.
+-
+-CI artifacts alone do not replace GitHub Releases. The native port pipeline also
+-attaches model-test and benchmark evidence, with explicit runtime limitations.
+-
+-## 26.4 transition
+-
+-Check official Minecraft/NeoForge release and dependency readiness before moving
+-the newer line. Retain earlier release tags and assets. This document is a policy,
+-not evidence that a background watcher exists or that 26.4 is already compatible.
++Verify native dependencies and actual builds for 26.3 and 26.4 independently. Do not
++copy version numbers onto a 26.1.2 JAR. This policy does not itself create a scheduled
++watcher or prove current 26.4 dependency readiness.
+diff --git a/build_mod.bat b/build_mod.bat
+index b99ecd9c92ca48aa88685065c5444ed38372ac4d..8b12ab8048504dd876d367a2761bbf0fac982766 100644
+--- a/build_mod.bat
++++ b/build_mod.bat
+@@ -3,3 +3,3 @@ setlocal EnableExtensions
+ cd /d "%~dp0"
+-echo [Foundations Soil] Minecraft 26.1.2 / 0.1.0-beta-port.1 native build
++echo [Foundations Soil] Minecraft 26.1.2 / 0.1.0-beta-port.2 native build
+ where java >nul 2>nul || (echo ERROR: Java 25 is required on PATH. & exit /b 1)
+@@ -8,3 +8,3 @@ call gradlew.bat --no-daemon clean test build soilScaleBenchmark
+ if errorlevel 1 exit /b %errorlevel%
+-echo Native compiled port: build\libs\foundations_soil-26.1.2-0.1.0-beta-port.1.jar
++echo Native compiled port: build\libs\foundations_soil-26.1.2-0.1.0-beta-port.2.jar
+ echo Requires genuine native TFC/Framework. Model tests do not establish a playable modpack.
+diff --git a/docs/ports/26.1.2/PORT2_RELEASE_NOTES.md b/docs/ports/26.1.2/PORT2_RELEASE_NOTES.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..aea3ca8eec9a5aa56342322a12365b83489e6d84
+--- /dev/null
++++ b/docs/ports/26.1.2/PORT2_RELEASE_NOTES.md
+@@ -0,0 +1,65 @@
++# Foundations Soil 26.1.2 — 0.1.0-beta-port.2
++
++**Native development prerelease. Full TFC/Framework gameplay validation remains blocked/unverified.**
++
++## Scope
++
++Development in this checkpoint is confined to `mc-26.1.2`. No changes to the 1.21.1
++branch, its source, or any existing release assets. The 1.21.1 line is outside our
++active maintenance scope; leave upstream TFC maintenance to its developers. Keep
++26.1.2 as the immediate playable target and 26.3 toward 26.4 as a separate forward path.
++
++## Changes
++
++- **Atomic in-memory liquid dosing:** the soil candidate and fluid extraction now
++  participate in the same native NeoForge transaction. Aborting the root or a nested
++  transfer restores the original cell object, including pending amendment effects,
++  history, occupancy and trends. A stale prepared snapshot cannot overwrite newer soil.
++- **Creative mode:** a nested extraction probe rolls the container back, then exactly
++  one soil dose commits with the root. Partially extracted amounts use their actual dose.
++- **Post-commit messages and events:** no successful-use notification or ledger refresh
++  is emitted while the dose is speculative. Publication is one-shot. An observer failure
++  after commit is logged as a notification failure, not as an unapplied/free amendment.
++- **Strict save headers:** present malformed, nonpositive and future schema/model
++  versions are rejected instead of silently falling back to legacy defaults.
++  Genuinely absent legacy headers still load. Missing/corrupt cell coordinates and
++  core measurements, malformed physical data and invalid field IDs are rejected.
++- **No format bump:** cell schema/model remain 4/4, ledger schema 5, protocol 8.
++  Valid port.1 data remains readable; this is validation/transaction hardening, not
++  a new save format.
++
++## Executed evidence
++
++All main/test sources compile against the genuine 26.1.2/NeoForge dependency classpath
++with Java 25. **93 model tests passed locally**, zero failed/skipped/aborted, including
++19 new tests for transactions and malformed saves. Three TFC-dependent checks remain
++outside this model suite and are not counted as successful tests. GitHub's checkpoint
++workflow independently rebuilds and reruns the suite before publication.
++
++The 1k/10k/50k cell model/storage benchmark preserves every cell through compressed
++save/load. Timings are microbenchmarks, not server TPS or evidence of a performance gain.
++
++## Limits and next gate
++
++These tests use the genuine NeoForge transaction engine with model Soil records and
++a test quantity journal. They do not substitute for real bucket/third-party container
++interactions in a running modpack. Soil's normal creation/calendar catch-up can happen
++before a transfer; that catch-up is not a speculative amendment. In-memory rollback
++also does not guarantee crash-atomic saving across Minecraft inventory and world files.
++
++TFC's inspected native 26.1.2 status still reports failed full compilation. Genuine
++native TFC and Framework startup, runtime API/Mixin binding, actual containers/crops,
++GUI rendering, multiplayer, seasonal behavior and whole-world migration remain open.
++No TFC or Framework implementations/stubs are bundled; both remain required.
++No 26.3 or 26.4 binary is part of this release.
++
++**Test only on backed-up disposable worlds.** Java 25 / Minecraft 26.1.2 /
++NeoForge 26.1.2.114. Restore backups rather than downgrade a modified world.
++
++Reproduce the automatic checks:
++
++```sh
++./gradlew --no-daemon clean test build soilScaleBenchmark
++```
++
++See the accompanying test reports and SHA256SUMS.txt for the published artifacts.
+diff --git a/docs/ports/26.1.2/VALIDATION.md b/docs/ports/26.1.2/VALIDATION.md
+index d807a4c78797dee6e428914236ff358c15ff0aa8..0a84bc45f6ae85e232b0ced92fa7b5799a14766f 100644
+--- a/docs/ports/26.1.2/VALIDATION.md
++++ b/docs/ports/26.1.2/VALIDATION.md
+@@ -1 +1,23 @@
++# Current checkpoint: 0.1.0-beta-port.2
++
++All main/test sources compiled locally on Java 25 against the native 26.1.2 classpath.
++**93 model tests passed** (19 new; zero failures, skips or aborts). Three TFC-dependent
++checks remain deferred outside this suite. The new 1k/10k/50k compressed save/load
++benchmark passed with exact cell comparisons. Runtime acceptance remains open.
++
++Transaction coverage: root abort/commit, nested abort/commit, parent failure, creative
++container probing, stale snapshots, journal reuse, invalid dosing and failed post-commit
++notifications. Save coverage: malformed/nonpositive/future headers, legacy header absence,
++missing coordinates/measurements, malformed physical data, invalid field IDs and repeated
++native-storage rejection without overwriting the source file.
++
++See [port.2 notes](PORT2_RELEASE_NOTES.md). The native release workflow must independently
++rebuild the source, run the suite, and validate packaged version/classfile/dependencies
++before publishing. Its attached evidence is authoritative for that run.
++
++The following **port.1 record is historical** and does not supersede the test count above.
++No 1.21.1 source or assets change in this checkpoint; 1.21.1 is outside our maintenance scope.
++
++---
++
+ # Native 26.1.2 port validation — 0.1.0-beta-port.1
+diff --git a/gradle.properties b/gradle.properties
+index c9d4f65b727e6e0d5315bd5af6cb7a292ef12376..bed55e8d1e40ba66d3626ffb18a1a37dc1096325 100644
+--- a/gradle.properties
++++ b/gradle.properties
+@@ -15,3 +15,3 @@ mod_name=Foundations Soil
+ mod_license=All Rights Reserved
+-mod_version=0.1.0-beta-port.1
++mod_version=0.1.0-beta-port.2
+ mod_group_id=com.foundations.soil
