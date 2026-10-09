@@ -1,0 +1,101 @@
+name: Beta source build and release
+on:
+  push:
+    branches: [main]
+    paths: ['tools/beta-import/READY.json']
+  workflow_dispatch:
+permissions:
+  contents: write
+  statuses: write
+concurrency:
+  group: soil-beta-import
+  cancel-in-progress: false
+jobs:
+  beta:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Verify and apply reviewed source bundle
+        run: |
+          python3 tools/beta-import/apply.py
+          git diff --check
+      - name: Compile, run model tests, package, and benchmark
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon -PmodRuntimeTests=false clean test build soilScaleBenchmark
+          python3 - <<'PY'
+          import pathlib, xml.etree.ElementTree as ET
+          roots = [ET.parse(p).getroot() for p in pathlib.Path('build/test-results/test').glob('TEST-*.xml')]
+          tests = sum(int(r.get('tests', 0)) for r in roots)
+          failures = sum(int(r.get('failures', 0)) + int(r.get('errors', 0)) for r in roots)
+          skipped = sum(int(r.get('skipped', 0)) for r in roots)
+          if tests < 70 or failures or skipped:
+              raise SystemExit(f'Unexpected result: tests={tests}, failures={failures}, skipped={skipped}')
+          pathlib.Path('build/reports/beta-test-summary.txt').write_text(f'Model tests: {tests} passed, zero failed, zero skipped. Full in-game/runtime matrix remains open.\n')
+          PY
+      - name: Commit tested implementation without overwriting concurrent changes
+        id: commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$GITHUB_SHA"
+          git config user.name 'Foundations Soil build bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          rm tools/beta-import/*.patch tools/beta-import/READY.json tools/beta-import/metadata.json
+          git add -- src docs/beta tools/beta-import build.gradle gradle.properties README.md ROADMAP_0.1.md ROADMAP_TO_1.0.md CHANGELOG.md CONFIGURATION.md DEVELOPMENT_LOG.md FIELD_LEDGER.md FOUNDATIONS_CANNABIS_SOIL_CONTRACT.md KUBEJS_EXAMPLE.js
+          git diff --cached --check
+          git commit -m 'Implement 0.1.0-beta: field editing, physical soil, laboratory, crop response and save/network hardening'
+          git push origin HEAD:refs/heads/main
+          source="$(git rev-parse HEAD)"
+          echo "sha=$source" >> "$GITHUB_OUTPUT"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/statuses/$source" -f state=success -f context='beta/build-and-model-tests' -f description='Java 21 compile and model tests passed; in-game runtime testing remains open' -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - name: Prepare reproducible release assets
+        shell: bash
+        run: |
+          mkdir -p build/release
+          cp build/libs/*.jar build/release/
+          cp build/reports/soil-scale-benchmark.json build/release/
+          cp build/reports/beta-test-summary.txt build/release/
+          cp docs/beta/VALIDATION.md build/release/BETA_VALIDATION.md
+          git archive --format=zip --output=build/release/Foundations_Soil-1.21.1-0.1.0-beta-SOURCE.zip HEAD
+          cd build/release
+          sha256sum *.jar *.zip *.json *.txt *.md > SHA256SUMS.txt
+      - name: Publish GitHub prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          tag='mc-1.21.1-v0.1.0-beta'
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to overwrite assets.' >&2
+            exit 1
+          fi
+          gh release create "$tag" --target "$SOURCE_SHA" --draft --prerelease --title 'Foundations Soil 1.21.1 — 0.1.0-beta' --notes-file docs/beta/RELEASE_NOTES.md
+          gh release upload "$tag" build/release/*
+          gh release edit "$tag" --draft=false --prerelease --latest=false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: soil-beta-validation
+          path: |
+            build/reports/
+            build/test-results/
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: soil-1.21.1-0.1.0-beta
+          path: build/release/*
+          if-no-files-found: error
