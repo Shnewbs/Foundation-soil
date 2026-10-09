@@ -1,0 +1,147 @@
+diff --git a/src/test/java/com/foundations/soil/SoilScaleBenchmark.java b/src/test/java/com/foundations/soil/SoilScaleBenchmark.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..a6d656fd6d96f65ac1b1c75e9d2abb5f7a483d25
+--- /dev/null
++++ b/src/test/java/com/foundations/soil/SoilScaleBenchmark.java
+@@ -0,0 +1,46 @@
++package com.foundations.soil;
++
++import com.foundations.soil.soil.*;
++import com.foundations.soil.ledger.*;
++import java.io.*;
++import java.nio.file.*;
++import java.util.*;
++import net.minecraft.nbt.*;
++
++/** Reproducible model/storage microbenchmark, not an in-game server TPS claim. */
++public final class SoilScaleBenchmark {
++    private static final SoilProfile PROFILE=new SoilProfile(.38,6.4,.55,.2,.6,.55,.06);
++    private static final SoilSimulator.Rates RATES=new SoilSimulator.Rates(.00008,.03,.0012,.006,.004,.004,.06);
++    private static final SoilSimulationContext CONTEXT=new SoilSimulationContext(22,.65);
++    private static volatile double sink;
++    public static void main(String[] args)throws Exception {
++        ModelConfigFixture.loadDefaults();
++        for(int i=0;i<5000;i++){var c=new SoilCell(i,0,64,PROFILE,1,0);SoilSimulator.advance(c,1,2,CONTEXT,RATES);sink+=c.profile().biology();}
++        StringBuilder json=new StringBuilder("{\n  \"kind\":\"model-storage-microbenchmark-not-server-TPS\",\n  \"java\":\"")
++            .append(System.getProperty("java.version")).append("\",\n  \"results\":[\n");
++        int[] sizes={1000,10000,50000};
++        for(int index=0;index<sizes.length;index++) {
++            int size=sizes[index];System.gc();long before=used();long start=System.nanoTime();
++            var world=new SoilWorldData();
++            for(int i=0;i<size;i++){var cell=new SoilCell(i,0,64,PROFILE,1,1);cell.initializePhysical(SoilTexture.LOAM,"tfc:dirt/loam");world.put(new SoilCellKey(i,0),cell);}
++            long initialize=System.nanoTime()-start;long resident=used()-before;
++            // Warm the serializer before the measured phases, without changing the target cell count.
++            SoilCell.load(world.getPacked(0).orElseThrow().save());
++            start=System.nanoTime();long[] keys=world.packedKeysSnapshot();long keyNanos=System.nanoTime()-start;
++            List<Long> batches=new ArrayList<>();start=System.nanoTime();
++            for(int at=0;at<keys.length;at+=250){long batch=System.nanoTime();for(int i=at;i<Math.min(keys.length,at+250);i++)SoilSimulator.advance(world.getPacked(keys[i]).orElseThrow(),2,3,CONTEXT,RATES);batches.add(System.nanoTime()-batch);}
++            long simulation=System.nanoTime()-start;batches.sort(Long::compare);
++            start=System.nanoTime();CompoundTag root=world.save(new CompoundTag(),null);long save=System.nanoTime()-start;
++            ByteArrayOutputStream bytes=new ByteArrayOutputStream();start=System.nanoTime();NbtIo.writeCompressed(root,bytes);long compress=System.nanoTime()-start;
++            start=System.nanoTime();var loaded=SoilWorldData.load(NbtIo.readCompressed(new ByteArrayInputStream(bytes.toByteArray()),NbtAccounter.unlimitedHeap()),null);long load=System.nanoTime()-start;
++            if(loaded.size()!=size)throw new AssertionError("Lost cells in scale round trip");
++            for(long key:keys)if(!world.getPacked(key).orElseThrow().save().equals(loaded.getPacked(key).orElseThrow().save()))throw new AssertionError("Changed cell "+key);
++            String row=String.format(Locale.ROOT,"    {\"cells\":%d,\"initialize_ms\":%.3f,\"key_snapshot_ms\":%.3f,\"simulate_day_ms\":%.3f,\"batch_250_p95_ms\":%.3f,\"save_nbt_ms\":%.3f,\"compress_ms\":%.3f,\"load_compressed_ms\":%.3f,\"compressed_bytes\":%d,\"allocated_heap_delta_bytes\":%d}",
++                size,initialize/1e6,keyNanos/1e6,simulation/1e6,batches.get(Math.min(batches.size()-1,(int)Math.ceil(batches.size()*.95)-1))/1e6,save/1e6,compress/1e6,load/1e6,bytes.size(),resident);
++            System.out.println(row);json.append(row).append(index+1<sizes.length?",\n":"\n");
++        }
++        json.append("  ],\n  \"limitations\":\"No live TFC chunks, networking, server tick loop, or dedicated-server pack. Heap delta is approximate allocation, not retained heap.\"\n}\n");
++        Path target=Path.of(args.length>0?args[0]:"build/reports/soil-scale-benchmark.json");Files.createDirectories(target.toAbsolutePath().getParent());Files.writeString(target,json);
++    }
++    private static long used(){Runtime r=Runtime.getRuntime();return r.totalMemory()-r.freeMemory();}
++}
+diff --git a/src/test/java/com/foundations/soil/SoilTrendTest.java b/src/test/java/com/foundations/soil/SoilTrendTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..dc0b3990600f3390bb8fb72870749aefc534c388
+--- /dev/null
++++ b/src/test/java/com/foundations/soil/SoilTrendTest.java
+@@ -0,0 +1,39 @@
++package com.foundations.soil;
++import static org.junit.jupiter.api.Assertions.*;
++import com.foundations.soil.soil.*;
++import org.junit.jupiter.api.Test;
++class SoilTrendTest {
++    private static final SoilProfile P=new SoilProfile(.4,6.5,.5,.1,.6,.6,.05);
++    @Test void historyIsBoundedAndSameDayObservationsReplaceRatherThanMultiply() {
++        SoilTrend t=new SoilTrend();for(int day=0;day<100;day++)t.record(day,P,.1);
++        assertEquals(16,t.points().size());assertEquals(84,t.points().getFirst().day());
++        t.record(99,P,.3);assertEquals(16,t.points().size());assertEquals(.3,t.points().getLast().cropPressure());
++        t.record(98,P,.9);assertEquals(.3,t.points().getLast().cropPressure());
++    }
++    @Test void snapshotsAreImmutableAndSaveRoundTrips() {
++        SoilTrend t=new SoilTrend();t.record(4,P,.2);var points=t.points();
++        assertThrows(UnsupportedOperationException.class,()->points.clear());t.record(5,P,.1);assertEquals(1,points.size());
++        SoilTrend read=new SoilTrend();read.load(t.save());assertEquals(t.points(),read.points());
++    }
++    @Test void monitoringDoesNotInventDaysBeforeTheFirstProbe() {
++        SoilCell c=new SoilCell(0,0,64,P,5,40);assertTrue(c.trend().points().isEmpty());c.enableMonitoring();
++        assertEquals(1,c.trend().points().size());assertEquals(40,c.trend().points().getFirst().day());
++        assertEquals(c.trend().points(),SoilCell.load(c.save()).trend().points());
++    }
++    @Test void plantingAndRemovalReplayStateSurvivesRestart() {
++        SoilCell c=new SoilCell(-1,-1,64,P,1,1);
++        assertTrue(c.markPlanting(-1,-1,true));assertFalse(c.markPlanting(-1,-1,true));
++        c=SoilCell.load(c.save());assertFalse(c.markPlanting(-1,-1,true));assertTrue(c.markPlanting(-1,-1,false));
++        assertFalse(c.markPlanting(-1,-1,false));assertTrue(c.markPlanting(-1,-1,true));
++    }
++    @Test void repeatedPickingKeepsPlantAliveAndDoesNotInventResidue() {
++        var cell=new com.foundations.soil.soil.SoilCell(0,0,new com.foundations.soil.soil.SoilProfile(.4,6.5,.6,.1,.7,.5,.02),0);
++        var family=com.foundations.soil.crop.CropFamily.OTHER;
++        cell.reconcilePlantings(1,family.id()); double residue=cell.residueReserve();
++        cell.recordPickingHarvest(family,100,2);cell.recordPickingHarvest(family,200,3);
++        assertEquals(1,cell.activePlantings()); assertEquals(2,cell.cropCycles());
++        assertEquals(residue,cell.residueReserve()); assertEquals(family.id(),cell.currentCropFamily());
++        var restored=com.foundations.soil.soil.SoilCell.load(cell.save());
++        assertEquals(1,restored.activePlantings()); assertEquals(2,restored.cropCycles());
++    }
++}
+diff --git a/src/test/java/com/foundations/soil/TfcBridgeTargetTest.java b/src/test/java/com/foundations/soil/TfcBridgeTargetTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..749e04673ba7b7e23cadbb86d11978cf75137e9e
+--- /dev/null
++++ b/src/test/java/com/foundations/soil/TfcBridgeTargetTest.java
+@@ -0,0 +1,29 @@
++package com.foundations.soil;
++import static org.junit.jupiter.api.Assertions.*;
++import java.io.InputStream;
++import org.junit.jupiter.api.Test;
++import org.objectweb.asm.ClassReader;
++import org.objectweb.asm.tree.ClassNode;
++import org.objectweb.asm.tree.MethodInsnNode;
++class TfcBridgeTargetTest {
++    @Test void pinnedTfcContainsExactlyOneExpectedYieldHook() throws Exception {
++        try(InputStream input=getClass().getResourceAsStream("/net/dries007/tfc/common/blocks/crop/CropHelpers.class")) {
++            assertNotNull(input);ClassNode node=new ClassNode();new ClassReader(input).accept(node,0);
++            var target=node.methods.stream().filter(m->m.name.equals("growthTickStep")&&m.desc.equals(
++                "(Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/util/RandomSource;JJLnet/dries007/tfc/common/blockentities/CropBlockEntity;)Z")).findFirst().orElseThrow();
++            int matches=0;for(var instruction:target.instructions)if(instruction instanceof MethodInsnNode m&&m.owner.equals("net/dries007/tfc/common/blockentities/CropBlockEntity")&&m.name.equals("setYield")&&m.desc.equals("(F)V"))matches++;
++            assertEquals(1,matches,"TFC changed the bridge target: review the native integration before release");
++        }
++    }
++    @Test void bothPickingClassesContainTwoConfirmedHarvestResetPaths() throws Exception {
++        for (String type : new String[]{"PickableCropBlock", "PickableClimbingCropBlock"}) {
++            try(InputStream input=getClass().getResourceAsStream("/net/dries007/tfc/common/blocks/crop/"+type+".class")) {
++                assertNotNull(input); ClassNode node=new ClassNode(); new ClassReader(input).accept(node,0);
++                var target=node.methods.stream().filter(m->m.name.equals("useItemOn")).findFirst().orElseThrow();
++                int matches=0;for(var instruction:target.instructions)
++                    if(instruction instanceof MethodInsnNode m&&m.owner.equals("net/dries007/tfc/common/blockentities/CropBlockEntity")&&m.name.equals("setYield")&&m.desc.equals("(F)V"))matches++;
++                assertEquals(2,matches,type+" changed its picking contract; review the mixin");
++            }
++        }
++    }
++}
+diff --git a/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension b/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension
+new file mode 100644
+index 0000000000000000000000000000000000000000..29b026fe7eb96f0b929bfa2f190351192cd5054c
+--- /dev/null
++++ b/src/test/resources/META-INF/services/org.junit.jupiter.api.extension.Extension
+@@ -0,0 +1 @@
++com.foundations.soil.ModelConfigFixture
+diff --git a/src/test/resources/junit-platform.properties b/src/test/resources/junit-platform.properties
+new file mode 100644
+index 0000000000000000000000000000000000000000..b876b3987b968978430af83fd41a458cb2f8bdb6
+--- /dev/null
++++ b/src/test/resources/junit-platform.properties
+@@ -0,0 +1,2 @@
++junit.jupiter.extensions.autodetection.enabled=true
++junit.jupiter.execution.parallel.enabled=false
