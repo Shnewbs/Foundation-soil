@@ -20,11 +20,8 @@ import net.minecraft.world.level.saveddata.SavedData;
 public final class SoilManager {
     private SoilManager() {}
 
-    private static final SavedData.Factory<SoilWorldData> FACTORY =
-        new SavedData.Factory<>(SoilWorldData::new, SoilWorldData::load);
-
     private static SoilWorldData data(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(FACTORY, SoilWorldData.DATA_NAME);
+        return com.foundations.soil.storage.SafeSavedData.get(level, SoilWorldData.DATA_NAME, SoilWorldData::new, SoilWorldData::load);
     }
 
     public static Optional<SoilCell> peek(ServerLevel level, BlockPos pos) {
@@ -41,9 +38,14 @@ public final class SoilManager {
         if (created) {
             cell = world.put(key, new SoilCell(key.cellX(), key.cellZ(), soilPos.getY(),
                 SoilInitializer.create(level, soilPos), tick, day));
-            SoilEvents.bus().post(new SoilEvents.CellInitialized(level.dimension().location(), soilPos.immutable(),
-                SoilSnapshots.from(cell)));
         }
+        if (!cell.physicalInitialized()) {
+            String soilId = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(soilPos).getBlock()).toString();
+            cell.initializePhysical(SoilTexture.forSoil(soilId), soilId);
+            world.setDirty();
+        }
+        if (created) SoilEvents.bus().post(new SoilEvents.CellInitialized(level.dimension().location(), soilPos.immutable(), SoilSnapshots.from(cell)));
+        if (cell.sampleY() != soilPos.getY()) world.setDirty();
         cell.touch(tick, soilPos.getY());
         long beforeDay = cell.lastSimulatedDay();
         if (advance(level, cell, day, tick, soilPos)) {
@@ -94,6 +96,7 @@ public final class SoilManager {
     public static SoilCell recordPlanting(ServerLevel level, BlockPos soilPos, CropFamily family) {
         SoilCell cell = getOrCreate(level, soilPos);
         CropFamily actual = family == null ? CropFamily.OTHER : family;
+        if (!cell.markPlanting(soilPos.getX(), soilPos.getZ(), true)) return cell;
         cell.recordPlanting(actual, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays(), soilPos.getY());
         data(level).setDirty();
         var snapshot = SoilSnapshots.from(cell);
@@ -105,6 +108,7 @@ public final class SoilManager {
     public static SoilCell recordCropRemoval(ServerLevel level, BlockPos soilPos, CropFamily family, boolean mature) {
         SoilCell cell = getOrCreate(level, soilPos);
         CropFamily actual = family == null ? CropFamily.OTHER : family;
+        if (!cell.markPlanting(soilPos.getX(), soilPos.getZ(), false)) return cell;
         cell.recordCropRemoval(actual, mature, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays());
         data(level).setDirty();
         var snapshot = SoilSnapshots.from(cell);
@@ -112,6 +116,17 @@ public final class SoilManager {
         SoilEvents.bus().post(new SoilEvents.CellChanged(level.dimension().location(), soilPos.immutable(),
             mature ? "crop_harvested" : "crop_removed", snapshot));
         return cell;
+    }
+
+    public static void recordPickingHarvest(ServerLevel level, BlockPos soilPos, CropFamily family) {
+        SoilCell cell = getOrCreate(level, soilPos);
+        CropFamily actual = family == null ? CropFamily.OTHER : family;
+        if (cell.markPlanting(soilPos.getX(), soilPos.getZ(), true)) {
+            cell.reconcilePlantings(cell.activePlantings() + 1, actual.id());
+        }
+        cell.recordPickingHarvest(actual, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays());
+        data(level).setDirty();
+        fireChanged(level, soilPos, cell, "crop_picked");
     }
 
     public static SoilCell recordDisturbance(ServerLevel level, BlockPos soilPos, double compaction, double structure) {
@@ -147,6 +162,10 @@ public final class SoilManager {
         data(level).setDirty();
         fireChanged(level, soilPos, cell, "set:" + stat);
         return cell;
+    }
+
+    public static void enableMonitoring(ServerLevel level, SoilCell cell) {
+        cell.enableMonitoring(); data(level).setDirty();
     }
 
     public static int loadedCellCount(ServerLevel level) { return data(level).size(); }
@@ -198,7 +217,7 @@ public final class SoilManager {
         int baseX = cell.cellX() * SoilCellKey.CELL_SIZE;
         int baseZ = cell.cellZ() * SoilCellKey.CELL_SIZE;
         int y = cell.sampleY() + 1;
-        int active = 0;
+        int active = 0, presentMask = 0;
         String family = "";
         boolean mixed = false;
         for (int dx = 0; dx < SoilCellKey.CELL_SIZE; dx++) {
@@ -206,11 +225,13 @@ public final class SoilManager {
                 var state = level.getBlockState(new BlockPos(baseX + dx, y, baseZ + dz));
                 if (!CropRegistry.isCultivatedCrop(state)) continue;
                 active++;
+                presentMask |= 1 << (dz * 4 + dx);
                 String next = CropRegistry.resolve(state).family().id();
                 if (family.isBlank()) family = next;
                 else if (!family.equals(next)) mixed = true;
             }
         }
+        cell.reconcilePlantingMask(presentMask);
         cell.reconcilePlantings(active, mixed ? "mixed" : family);
     }
 

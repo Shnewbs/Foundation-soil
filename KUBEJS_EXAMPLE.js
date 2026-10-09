@@ -1,4 +1,6 @@
-// Foundations Soil 0.0.3a — KubeJS/Java-interop example.
+// Foundations Soil 0.1.0-beta — KubeJS/Java-interop example.
+// Java interop only; this is not an automatically registered KubeJS global/plugin.
+// See docs/beta/INTEGRATION_CONTRACT.md; native pack reload tests remain required.
 // Soil owns agronomy; your script/mod owns the actual item/fluid delivery event.
 
 const SoilApi = Java.loadClass('com.foundations.soil.api.FoundationsSoilApi')

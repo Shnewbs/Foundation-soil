@@ -13,7 +13,7 @@ final class SoilSimulationScheduler {
 
     static void tick(ServerLevel level, long day, int budget) {
         State state = STATES.get(level);
-        if (state == null || day > state.day) {
+        if (state == null || (day > state.day && state.index >= state.keys.length)) {
             state = new State(day, SoilManager.packedCellKeys(level), 0);
             STATES.put(level, state);
         }
@@ -24,10 +24,10 @@ final class SoilSimulationScheduler {
         long started = System.nanoTime();
         while (left-- > 0 && state.index < state.keys.length) {
             attempted++;
-            if (SoilManager.simulatePacked(level, state.keys[state.index++], day)) changed++;
+            if (SoilManager.simulatePacked(level, state.keys[state.index++], state.day)) changed++;
         }
         if (attempted > 0) {
-            SoilRuntimeMetrics.recordBatch(day, attempted, changed, System.nanoTime() - started);
+            SoilRuntimeMetrics.recordBatch(state.day, attempted, changed, System.nanoTime() - started);
         }
     }
 

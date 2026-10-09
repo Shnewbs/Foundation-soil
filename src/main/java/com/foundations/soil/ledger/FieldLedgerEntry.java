@@ -35,6 +35,9 @@ public final class FieldLedgerEntry {
     private String note = "";
     private int fieldId;
 
+    private com.foundations.soil.soil.SoilTexture texture;
+    private final com.foundations.soil.soil.SoilTrend trend = new com.foundations.soil.soil.SoilTrend();
+    private long lastProbeDay = -1;
     private double organicMatter;
     private double pH;
     private double drainage;
@@ -87,6 +90,12 @@ public final class FieldLedgerEntry {
         this.lastScannedTick = Math.max(0, discoveredTick);
     }
 
+    public java.util.Optional<com.foundations.soil.soil.SoilTexture> texture() { return java.util.Optional.ofNullable(texture); }
+    public List<com.foundations.soil.soil.SoilTrend.Point> trendPoints() { return trend.points(); }
+    public long lastProbeDay() { return lastProbeDay; }
+    public com.foundations.soil.soil.SoilProfile profileSnapshot() {
+        return new com.foundations.soil.soil.SoilProfile(organicMatter, pH, drainage, compaction, structure, biology, salinity);
+    }
     public String dimension() { return dimension; }
     public int cellX() { return cellX; }
     public int cellZ() { return cellZ; }
@@ -144,6 +153,9 @@ public final class FieldLedgerEntry {
 
     public void refresh(SoilCell cell, long tfcTick, long tfcDay) {
         sampleY = cell.sampleY();
+        texture = cell.physicalInitialized() ? cell.texture() : null;
+        trend.clear();
+        for (var point : cell.trend().points()) trend.record(point.day(), point.profile(), point.cropPressure());
         lastScannedTick = Math.max(0, tfcTick);
         lastScannedDay = Math.max(0, tfcDay);
         var p = cell.profile();
@@ -191,6 +203,7 @@ public final class FieldLedgerEntry {
     /** Captures a read-only TerraFirmaCraft snapshot from the exact block probed by the player. */
     public void refreshTfc(ServerLevel level, BlockPos soilPos) {
         TfcSoilSnapshot snapshot = TfcSoilSnapshot.capture(level, soilPos);
+        lastProbeDay = Math.max(0, net.dries007.tfc.util.calendar.Calendars.SERVER.getTotalCalendarDays());
         tfcSoilBlock = snapshot.soilBlock();
         tfcFarmlandDataPresent = snapshot.farmlandDataPresent();
         tfcHydration = snapshot.hydration();
@@ -209,6 +222,13 @@ public final class FieldLedgerEntry {
 
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
+        tag.putLong("last_probe_day", lastProbeDay);
+        if (texture != null) {
+            CompoundTag physical = new CompoundTag();
+            physical.putDouble("sand", texture.sand()); physical.putDouble("silt", texture.silt()); physical.putDouble("clay", texture.clay());
+            tag.put("physical", physical);
+        }
+        tag.put("trend", trend.save());
         tag.putString("dimension", dimension);
         tag.putInt("cell_x", cellX);
         tag.putInt("cell_z", cellZ);
@@ -264,6 +284,12 @@ public final class FieldLedgerEntry {
             tag.getString("dimension"), tag.getInt("cell_x"), tag.getInt("cell_z"), tag.getInt("sample_y"),
             tag.getLong("first_discovered_tick")
         );
+        entry.lastProbeDay = tag.contains("last_probe_day", Tag.TAG_LONG) ? tag.getLong("last_probe_day") : -1;
+        if (tag.contains("physical", Tag.TAG_COMPOUND)) {
+            CompoundTag physical = tag.getCompound("physical");
+            entry.texture = new com.foundations.soil.soil.SoilTexture(physical.getDouble("sand"), physical.getDouble("silt"), physical.getDouble("clay"));
+        }
+        entry.trend.load(tag.getList("trend", Tag.TAG_COMPOUND));
         entry.lastScannedTick = Math.max(0, tag.getLong("last_scanned_tick"));
         entry.lastScannedDay = Math.max(0, tag.getLong("last_scanned_day"));
         entry.favorite = tag.getBoolean("favorite");
@@ -277,6 +303,9 @@ public final class FieldLedgerEntry {
         entry.biology = tag.getDouble("biology");
         entry.salinity = tag.getDouble("salinity");
         entry.nutrientAccess = tag.getDouble("nutrient_access");
+        for (double value : new double[]{entry.organicMatter, entry.pH, entry.drainage, entry.compaction,
+                entry.structure, entry.biology, entry.salinity, entry.nutrientAccess})
+            if (!Double.isFinite(value)) throw new IllegalStateException("Non-finite saved ledger measurement");
         entry.amendmentApplications = Math.max(0, tag.getInt("amendment_applications"));
         entry.cropCycles = Math.max(0, tag.getInt("crop_cycles"));
         entry.continuousCropCycles = Math.max(0, tag.getInt("continuous_crop_cycles"));
@@ -319,14 +348,13 @@ public final class FieldLedgerEntry {
 
     public String key() { return key(dimension, cellX, cellZ); }
 
-    private static String clean(String value, int max) {
-        if (value == null) return "";
-        String normalized = value.replace('\n', ' ').replace('\r', ' ').trim();
-        return normalized.length() <= max ? normalized : normalized.substring(0, max);
-    }
+    private static String clean(String value, int max) { return LedgerText.clean(value, max); }
 
     private static int hydration(int value) { return Math.max(0, Math.min(100, value)); }
-    private static double unit(double value) { return Math.max(0.0, Math.min(1.0, value)); }
+    private static double unit(double value) {
+        if (!Double.isFinite(value)) throw new IllegalArgumentException("Non-finite saved ledger value");
+        return Math.max(0.0, Math.min(1.0, value));
+    }
     private static double nonNegative(double value) { return Double.isFinite(value) ? Math.max(0.0, value) : 0.0; }
     private static double positiveOrOne(double value) { return Double.isFinite(value) && value > 0.0 ? value : 1.0; }
 }

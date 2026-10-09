@@ -14,7 +14,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 /** Global per-server player Field Ledger data, stored in the Overworld data storage. */
 public final class FieldLedgerData extends SavedData {
     public static final String DATA_NAME = "foundations_soil_field_ledger";
-    public static final int SCHEMA_VERSION = 4;
+    public static final int SCHEMA_VERSION = 5;
 
     private final Map<UUID, PlayerFieldLedger> ledgers = new HashMap<>();
 
@@ -37,15 +37,14 @@ public final class FieldLedgerData extends SavedData {
             throw new IllegalStateException("Foundations Field Ledger schema " + schema + " is newer than supported schema " + SCHEMA_VERSION);
         }
         FieldLedgerData data = new FieldLedgerData();
-        ListTag players = root.getList("players", Tag.TAG_COMPOUND);
+        ListTag players = com.foundations.soil.storage.SavedTagChecks.compounds(root, "players", true);
         for (int i = 0; i < players.size(); i++) {
             CompoundTag player = players.getCompound(i);
-            try {
-                UUID id = UUID.fromString(player.getString("uuid"));
-                data.ledgers.put(id, PlayerFieldLedger.load(player.getCompound("ledger")));
-            } catch (IllegalArgumentException ex) {
-                FoundationsSoil.LOGGER.warn("[Foundations Soil] Skipping malformed Field Ledger player UUID: {}", player.getString("uuid"));
-            }
+            final UUID id;
+            try { id = UUID.fromString(player.getString("uuid")); }
+            catch (IllegalArgumentException ex) { throw new IllegalStateException("Malformed Field Ledger owner; refusing to discard saved data", ex); }
+            PlayerFieldLedger ledger = PlayerFieldLedger.load(player.getCompound("ledger"));
+            if (data.ledgers.putIfAbsent(id, ledger) != null) throw new IllegalStateException("Duplicate Field Ledger owner " + id);
         }
         if (schema < SCHEMA_VERSION) data.setDirty();
         FoundationsSoil.LOGGER.info("[Foundations Soil] Loaded Field Ledger data for {} player(s) (schema={} -> {})",

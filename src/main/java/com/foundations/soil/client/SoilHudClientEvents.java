@@ -25,10 +25,22 @@ public final class SoilHudClientEvents {
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
+        boolean refresh = ClientFieldGuideState.isRefresh();
         var guidePayload = ClientFieldGuideState.take();
         if (guidePayload != null) {
-            mc.setScreen(new FieldGuideScreen(guidePayload));
+            if (mc.player != null && mc.level != null) {
+                if (mc.screen instanceof FieldGuideScreen guide) guide.acceptData(guidePayload);
+                else if (mc.screen instanceof LedgerEditorScreen editor) editor.acceptData(guidePayload);
+                else if (mc.screen instanceof LaboratoryScreen lab) lab.acceptData(guidePayload);
+                else if (!refresh) mc.setScreen(new FieldGuideScreen(guidePayload));
+            }
         }
+        var labOpen = ClientLaboratoryState.takeOpen();
+        if (labOpen != null && mc.player != null && mc.level != null) mc.setScreen(new LaboratoryScreen(labOpen));
+        var labResult = ClientLaboratoryState.takeResult();
+        if (labResult != null && mc.screen instanceof LaboratoryScreen lab) lab.acceptResult(labResult);
+        var editReply = ClientLedgerEditState.take();
+        if (editReply != null && mc.screen instanceof LedgerEditorScreen editor) editor.acceptReply(editReply);
         if (mc.player == null || mc.level == null) {
             ClientSoilHudState.clear();
             return;
@@ -76,6 +88,8 @@ public final class SoilHudClientEvents {
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         ClientSoilHudState.clear();
         ClientFieldGuideState.clear();
+        ClientLedgerEditState.clear();
+        ClientLaboratoryState.clear();
         requestCooldown = 0;
     }
 }

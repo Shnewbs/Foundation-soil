@@ -143,6 +143,7 @@ final class DefaultSoilService implements SoilService {
     private static void requireRead(ServerLevel level, BlockPos pos) {
         if (level == null) throw new IllegalArgumentException("ServerLevel cannot be null");
         if (pos == null) throw new IllegalArgumentException("soil position cannot be null");
+        if (!level.getServer().isSameThread()) throw new IllegalStateException("Foundations Soil world reads require the authoritative server thread");
     }
 
     private static void requireMutation(ServerLevel level, BlockPos pos) {

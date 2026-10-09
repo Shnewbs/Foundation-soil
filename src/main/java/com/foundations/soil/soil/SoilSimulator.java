@@ -11,7 +11,13 @@ public final class SoilSimulator {
         double salinityLeach,
         double cropPressureDecay,
         double amendmentLoadDecay
-    ) {}
+    ) {
+        public Rates {
+            for (double rate : new double[]{organicMatterDecay, biologyResponse, compactionRecovery, structureResponse,
+                    salinityLeach, cropPressureDecay, amendmentLoadDecay})
+                if (!Double.isFinite(rate) || rate < 0) throw new IllegalArgumentException("Simulation rates must be finite and non-negative");
+        }
+    }
 
     public static boolean advance(SoilCell cell, long currentDay, long tfcTick, SoilSimulationContext env, Rates rates) {
         if (cell.simulationBaselinePending()) {
@@ -25,7 +31,8 @@ public final class SoilSimulator {
         // Release persisted amendment residues before the day's biological/structural response is evaluated.
         cell.releasePendingAmendments(days);
         SoilProfile p = cell.profile();
-        double moisture = env.hydration();
+        SoilPhysics physical = SoilPhysics.evaluate(cell.texture(), p, env.hydration());
+        double moisture = physical.availableWater();
         double tempFactor = clamp(1.0 - Math.abs(env.temperatureC() - 22.0) / 38.0, 0.08, 1.0);
         double moistureFactor = clamp(1.0 - Math.abs(moisture - 0.62) / 0.62, 0.10, 1.0);
         double phFactor = clamp(1.0 - Math.abs(p.pH() - 6.5) / 4.0, 0.20, 1.0);
@@ -54,7 +61,7 @@ public final class SoilSimulator {
         compaction = unit(compaction - recovery * days);
 
         int waterloggingEvents = cell.waterloggingEvents();
-        if (moisture >= 0.95 && p.drainage() < 0.45) {
+        if (physical.moisture() == SoilPhysics.Moisture.WATERLOGGED) {
             compaction = unit(compaction + 0.0007 * days);
             waterloggingEvents += (int) Math.min(Integer.MAX_VALUE - (long) waterloggingEvents, elapsed);
         }
@@ -62,7 +69,7 @@ public final class SoilSimulator {
         double structureTarget = unit(0.30 + om * 0.36 + biology * 0.28 - compaction * 0.20);
         double structure = approach(p.structure(), structureTarget, rates.structureResponse(), days);
 
-        double leach = rates.salinityLeach() * p.drainage() * Math.max(0.15, moisture) * days;
+        double leach = rates.salinityLeach() * physical.effectiveDrainage() * Math.max(0.15, moisture) * days;
         double salinity = unit(p.salinity() * Math.exp(-Math.max(0, leach)));
 
         double pressureDecay = rates.cropPressureDecay() * (cell.activePlantings() == 0 ? 1.8 : 0.45) * days;
@@ -70,13 +77,16 @@ public final class SoilSimulator {
         double amendmentLoad = Math.max(0, cell.recentAmendmentLoad() * Math.exp(-Math.max(0, rates.amendmentLoadDecay() * days)));
 
         SoilProfile next = p.withDynamics(om, compaction, structure, biology, salinity);
-        long bare = cell.daysBare() + (cell.activePlantings() == 0 ? elapsed : 0);
-        long covered = cell.daysCovered() + (cell.activePlantings() > 0 ? elapsed : 0);
+        long bare = saturatingAdd(cell.daysBare(), cell.activePlantings() == 0 ? elapsed : 0);
+        long covered = saturatingAdd(cell.daysCovered(), cell.activePlantings() > 0 ? elapsed : 0);
         cell.setSimulationState(next, currentDay, tfcTick, bare, covered, waterloggingEvents, pressure,
             newReserve, newResidue, amendmentLoad);
         return true;
     }
 
+    private static long saturatingAdd(long value, long added) {
+        return added > Long.MAX_VALUE - value ? Long.MAX_VALUE : value + added;
+    }
     private static double approach(double current, double target, double rate, double days) {
         if (rate <= 0) return current;
         double weight = 1.0 - Math.exp(-rate * days);

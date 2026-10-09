@@ -34,6 +34,7 @@ public final class SoilGameplayEvents {
     @SubscribeEvent
     public static void stopped(ServerStoppedEvent event) {
         SoilSimulationScheduler.clear();
+        com.foundations.soil.network.SoilNetwork.clear();
     }
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
@@ -52,7 +53,9 @@ public final class SoilGameplayEvents {
         if (!CropRegistry.isCultivatedCrop(event.getState())) return;
         findSoilBelow(level, event.getPos()).ifPresent(soil -> {
             CropDefinition def = CropRegistry.resolve(event.getState());
-            SoilManager.recordCropRemoval(level, soil, def.family(), CropRegistry.isMature(event.getState()));
+            boolean mature = level.getBlockEntity(soil.above()) instanceof net.dries007.tfc.common.blockentities.CropBlockEntity crop
+                ? crop.getGrowth() >= 1.0f : CropRegistry.isMature(event.getState());
+            SoilManager.recordCropRemoval(level, soil, def.family(), mature);
         });
     }
 

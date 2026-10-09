@@ -2,65 +2,64 @@
 
 A TerraFirmaCraft expansion with persistent living-soil cells, amendments, and field records.
 
-**Current source:** `0.0.3a.R6` · **Target:** `0.1.0` feature-frozen beta.
-The 0.1 milestone is planned, not a released or validated build.
+**Version: `0.1.0-beta` for Minecraft 1.21.1.** This beta combines the R7/R8, 0.0.4a, 0.0.5a, 0.0.6a and 0.0.7a implementation packages. Intermediate versions were not separately released. It is not a final 1.0 or a claim that manual game testing is complete.
+
+## Included in this beta
+
+- Scrollable Field Guide details, bounded server paging, and GUI field creation, renaming, deletion, assignment, notes and favorites.
+- Persistent sand/silt/clay composition; climate-informed initial profiles; derived drainage, water-holding, aeration and root-zone response.
+- A craftable Soil Laboratory with two comparison panes, complete-field snapshot analysis and up to 16 observed trend points per monitored cell.
+- TFC maturity/picking-history fixes, a configurable newly-earned-yield response, and API contract 3 physical snapshots and abstract tolerance inputs.
+- Protocol 8 input bounds, cooldown/replay controls, stricter persistence validation, and protection against replacing unreadable saved data with an empty record.
+- Existing seven soil statistics, TFC-calendar simulation, crop rotation, residue, solid/liquid amendments, delayed releases and integration gateways remain available.
+
+TFC owns calendar, climate, hydration, crop growth/expiry and stored N/P/K. Soil does not implement fluid transport or genetics. The yield bridge modifies only positive newly accumulated yield and can be disabled with `crop_response.tfc_yield_response_strength=0.0`.
 
 ## Requirements
 
-| Component | Version |
+| Component | Requirement |
 | --- | --- |
-| Minecraft | 1.21.1 |
-| Java | 21 |
-| NeoForge | 21.1.250 or compatible newer 21.1 release |
-| TerraFirmaCraft | 4.2.8+ for Minecraft 1.21.1 |
-| Foundations Framework | 0.0.5a+ for Minecraft 1.21.1 |
+| Minecraft / Java | 1.21.1 / Java 21 |
+| NeoForge | Pinned to 21.1.250 |
+| TerraFirmaCraft | Build pinned to file 8831715 (4.2.10); metadata minimum 4.2.8 |
+| Patchouli | Build pinned to 1.21.1-92-NEOFORGE; required by TFC |
+| Foundations Framework | Genuine compatible 1.21.1 build, metadata minimum 0.0.5a |
 
-## Implemented
+Other dependency versions require separate runtime validation. Framework remains required; it is not bundled or replaced with a stub.
 
-- Persistent 4×4 Soil Cells with organic matter, pH, drainage, compaction, structure, biology, and salinity.
-- TFC-calendar simulation, crop history, rotation pressure, and delayed amendment release.
-- Solid amendments and five physical amendment fluids with TFC barrel recipes and fluid-container application.
-- Soil Probe, Field Guide, and per-player Field Ledger with named fields, notes, favorites, TFC snapshots, and amendment history.
-- Configurable agronomy definitions, Java/script gateways, and external delivery hooks.
+## Upgrade safely
 
-TFC owns calendar, climate, hydration, crop growth, and stored N/P/K. Soil does not implement irrigation transport or genetics.
+**Back up the entire world before upgrading.** Soil Cell schema/model change from 3/3 to 4/4; Field Ledger schema changes from 4 to 5; network protocol changes from 7 to 8. Use matching client/server beta JARs. Do not downgrade an upgraded world: restore the backup instead.
 
-## Build
+If saved data cannot be read, the guard refuses an empty replacement. Stop the server and repair or restore the original file rather than deleting it to silence the error.
 
-Install Java 21, then run from this checkout:
+## Build and verification
 
 ```sh
-./gradlew --no-daemon clean test build
+./gradlew --no-daemon clean test build soilScaleBenchmark
 ```
 
-On Windows:
+Windows users can use `gradlew.bat` with the same arguments. Outputs include `build/libs/foundations_soil-1.21.1-0.1.0-beta.jar` and the sources JAR. Benchmark output is `build/reports/soil-scale-benchmark.json`.
 
-```bat
-build_mod.bat
+The standalone model suite contains **70 passing tests** against the actual pinned dependency classpath. Tests cover migration, persistence, ownership, packets, resources and exact TFC hook targets. The GitHub release pipeline reruns native Gradle compilation, tests and the benchmark before publishing. These results are not evidence of a full game launch or live-server TPS.
+
+Full mod-loading tests are a separate mode:
+
+```sh
+./gradlew --no-daemon -PmodRuntimeTests=true clean test
 ```
 
-Output: `build/libs/foundations_soil-1.21.1-0.0.3a.R6.jar`.
-The Gradle wrapper is checked in. First build requires access to Gradle, NeoForge, Maven, and CurseMaven dependencies.
-Framework is required in the game; compilation uses a reflection bridge. An optional local Framework JAR can be placed in `libs/` as described in [libs/README.txt](libs/README.txt).
-
-GitHub Actions builds with Java 21 and uploads build/test artifacts. A successful build does not replace in-game migration, GUI, or dedicated-server testing.
-
-## Development status
-
-The local build attempt on 2026-10-08 stopped before compilation because `services.gradle.org` could not resolve. The local environment also has Java 17 rather than 21. No new compiled release is claimed.
-
-The next implementation work is Field Guide scrolling and server-validated GUI field management. Physical composition, laboratory analysis, integration validation, and scale testing follow before the 0.1 freeze.
+This requires the genuine Framework JAR at the configured `libs/<framework_jar>` path. Client/dedicated-server launches, in-game Mixin transformation, GUI-scale checks, real-world upgrades, seasonal balance and optional-integration pack tests remain open. See [the validation matrix](docs/beta/VALIDATION.md).
 
 ## Documentation
 
-- [0.1 delivery plan and gates](ROADMAP_0.1.md)
-- [Full roadmap to 1.0](ROADMAP_TO_1.0.md)
-- [Changelog](CHANGELOG.md)
-- [Configuration](CONFIGURATION.md)
-- [Field Ledger](FIELD_LEDGER.md)
-- [Cannabis/Soil integration boundary](FOUNDATIONS_CANNABIS_SOIL_CONTRACT.md)
-- [Historical revision records](docs/history/README.md)
+- [Beta release notes](docs/beta/RELEASE_NOTES.md)
+- [Executed evidence and open testing gates](docs/beta/VALIDATION.md)
+- [API contract 3](docs/beta/INTEGRATION_CONTRACT.md)
+- [0.1 milestone tracking](ROADMAP_0.1.md)
+- [Roadmap to 1.0](ROADMAP_TO_1.0.md)
+- [Changelog](CHANGELOG.md), [configuration](CONFIGURATION.md), [Field Ledger](FIELD_LEDGER.md)
 
 ## Platform and release policy
 
-Maintain 1.21.1 and 26.3 in parallel; move the newer line to 26.4 when released while retaining 1.21.1. Every platform release must publish its tested JAR as a GitHub Release. The 26.3 port is pending. See [RELEASING.md](RELEASING.md).
+Retain 1.21.1 while developing the newer 26.3 line separately; move that newer line to 26.4 when released and compatible dependencies are validated. **This beta is 1.21.1 only; the Soil 26.3 port is pending.** Every platform release must publish its own built JAR and source on GitHub Releases. This beta uses tag `mc-1.21.1-v0.1.0-beta` and is a prerelease, not a stable/latest release.

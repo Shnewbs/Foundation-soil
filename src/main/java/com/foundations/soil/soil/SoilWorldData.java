@@ -30,10 +30,11 @@ public final class SoilWorldData extends SavedData {
         if (model > SoilCell.MODEL_VERSION) throw new IllegalStateException("Foundations Soil model " + model + " is newer than supported model " + SoilCell.MODEL_VERSION);
 
         SoilWorldData data = new SoilWorldData();
-        ListTag list = root.getList("cells", Tag.TAG_COMPOUND);
+        ListTag list = com.foundations.soil.storage.SavedTagChecks.compounds(root, "cells", true);
         for (int i = 0; i < list.size(); i++) {
             SoilCell cell = SoilCell.load(list.getCompound(i));
-            data.cells.put(new SoilCellKey(cell.cellX(), cell.cellZ()).packed(), cell);
+            if (data.cells.putIfAbsent(new SoilCellKey(cell.cellX(), cell.cellZ()).packed(), cell) != null)
+                throw new IllegalStateException("Duplicate persisted Soil Cell; refusing to overwrite history");
         }
         if (schema < SoilCell.SCHEMA_VERSION || model < SoilCell.MODEL_VERSION) data.setDirty();
         FoundationsSoil.LOGGER.info("[Foundations Soil] Loaded {} persistent soil cells (save schema={} -> {}, model={} -> {})",

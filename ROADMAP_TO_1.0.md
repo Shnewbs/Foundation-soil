@@ -1,3 +1,9 @@
+# Current delivery note - 0.1.0-beta
+
+The R7/R8 and 0.0.4a through 0.0.7a implementation packages are now combined in 0.1.0-beta for 1.21.1. The detailed roadmap below is retained as historical planning, not a current checklist of absent code. Consult [ROADMAP_0.1.md](ROADMAP_0.1.md) and [the beta validation matrix](docs/beta/VALIDATION.md) for implemented work versus remaining acceptance. Manual in-game, multiplayer, seasonal and optional-integration tests remain open; the 26.3 Soil port is separate and pending. This is not a stable 1.0.
+
+---
+
 # Foundations Soil — Roadmap to 1.0
 ## Current baseline: 0.0.3a.R6
 ### Minecraft 1.21.1 · NeoForge 21.1.250 · TerraFirmaCraft 4.2.8+ · Foundations Framework 0.0.5a+

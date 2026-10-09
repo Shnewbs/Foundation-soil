@@ -1,3 +1,11 @@
+# 0.1.0-beta - 2026-10-08 Pacific
+
+Combined R7/R8, physical-soil, Laboratory, integration and hardening implementations. Added full Field Guide scrolling and GUI edits; persistent texture and root-zone physics; craftable comparison Laboratory and bounded trends; maturity/picking fixes and configurable TFC yield-delta response; API contract 3; protocol 8 request bounds and replay controls; strict persistence and an unreadable-save replacement guard. Repaired Java/Parchment build properties, added reproducible source/binary packaging, 70 automated tests and 1k/10k/50k model/storage benchmarks.
+
+**Back up worlds:** Soil schema/model 4/4, ledger schema 5, network 8. Runtime pack and manual beta acceptance remain pending. Intermediate milestone numbers were not separately released. See [full release notes](docs/beta/RELEASE_NOTES.md).
+
+---
+
 # Foundations Soil — Changelog
 
 ## Unreleased — repository preparation for 0.1

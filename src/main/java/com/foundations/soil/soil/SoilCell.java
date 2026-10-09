@@ -16,13 +16,18 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 public final class SoilCell {
-    public static final int SCHEMA_VERSION = 3;
-    public static final int MODEL_VERSION = 3;
+    public static final int SCHEMA_VERSION = 4;
+    public static final int MODEL_VERSION = 4;
 
     private final int cellX;
     private final int cellZ;
     private int sampleY;
     private SoilProfile profile;
+    private SoilTexture texture;
+    private String geologySource = "";
+    private boolean monitoring;
+    private final SoilTrend trend = new SoilTrend();
+    private int plantingKnownMask, plantingPresentMask;
     private long lastTfcTick;
     private long lastSimulatedDay;
     private int amendmentApplications;
@@ -60,6 +65,7 @@ public final class SoilCell {
         this.cellZ = cellZ;
         this.sampleY = sampleY;
         this.profile = profile;
+        java.util.Objects.requireNonNull(profile, "profile");
         this.lastTfcTick = Math.max(0L, lastTfcTick);
         this.lastSimulatedDay = Math.max(0L, lastSimulatedDay);
     }
@@ -68,6 +74,27 @@ public final class SoilCell {
     public int cellZ() { return cellZ; }
     public int sampleY() { return sampleY; }
     public SoilProfile profile() { return profile; }
+    public SoilTexture texture() { return texture == null ? SoilTexture.LOAM : texture; }
+    public boolean physicalInitialized() { return texture != null; }
+    public String geologySource() { return geologySource; }
+    public SoilTrend trend() { return trend; }
+    public void initializePhysical(SoilTexture value, String source) {
+        if (texture != null) return;
+        texture = java.util.Objects.requireNonNull(value);
+        geologySource = com.foundations.soil.ledger.LedgerText.clean(source, 128);
+    }
+    public void enableMonitoring() { monitoring = true; sampleTrend(); }
+    public void sampleTrend() {
+        if (monitoring) trend.record(lastSimulatedDay, profile, continuousPressure);
+    }
+    /** One occupancy bit per horizontal block in the existing 4x4 cell model. */
+    public boolean markPlanting(int x, int z, boolean planted) {
+        int bit = 1 << (Math.floorMod(z, 4) * 4 + Math.floorMod(x, 4));
+        if ((plantingKnownMask & bit) != 0 && ((plantingPresentMask & bit) != 0) == planted) return false;
+        plantingKnownMask |= bit;
+        if (planted) plantingPresentMask |= bit; else plantingPresentMask &= ~bit;
+        return true;
+    }
     public long lastTfcTick() { return lastTfcTick; }
     public long lastSimulatedDay() { return lastSimulatedDay; }
     public int amendmentApplications() { return amendmentApplications; }
@@ -153,14 +180,15 @@ public final class SoilCell {
         }
 
         recentAmendmentLoad = Math.max(0.0, recentAmendmentLoad + amendment.diminishingWeight() * normalizedDose);
-        amendmentApplications++;
-        if (amendment.organicMatter() > 0 || amendment.organicReserve() > 0) organicInputs++;
+        amendmentApplications = increment(amendmentApplications);
+        if (amendment.organicMatter() > 0 || amendment.organicReserve() > 0) organicInputs = increment(organicInputs);
         lastAmendmentId = amendment.id();
         lastAmendmentDay = Math.max(0, currentDay);
         lastAmendmentAmount = amount;
         lastAmendmentUnit = unit.name();
         lastAmendmentConcentration = concentration;
         lastSimulatedDay = Math.max(lastSimulatedDay, currentDay);
+        sampleTrend();
         touch(tfcTick);
 
         return new AmendmentApplicationOutcome(amendment.id(), amendment.form(), amount, unit, concentration,
@@ -221,8 +249,12 @@ public final class SoilCell {
         }
         touch(tfcTick, y);
         lastSimulatedDay = Math.max(lastSimulatedDay, currentDay);
+        sampleTrend();
     }
 
+    public void reconcilePlantingMask(int presentMask) {
+        plantingKnownMask = 0xffff; plantingPresentMask = presentMask & 0xffff;
+    }
     public void reconcilePlantings(int active, String family) {
         this.activePlantings = Math.max(0, Math.min(16, active));
         this.currentCropFamily = activePlantings == 0 ? "" : (family == null ? "" : family);
@@ -231,17 +263,26 @@ public final class SoilCell {
     public void recordCropRemoval(CropFamily family, boolean mature, long tfcTick, long currentDay) {
         activePlantings = Math.max(0, activePlantings - 1);
         if (activePlantings == 0) currentCropFamily = "";
-        if (mature) recordHarvest(family);
-        else disturbanceEvents++;
+        if (mature) recordHarvest(family, true);
+        else disturbanceEvents = increment(disturbanceEvents);
         touch(tfcTick);
         lastSimulatedDay = Math.max(lastSimulatedDay, currentDay);
+        sampleTrend();
     }
 
-    private void recordHarvest(CropFamily family) {
+    /** Picking fruit leaves the live plant and its residues in place. */
+    public void recordPickingHarvest(CropFamily family, long tfcTick, long currentDay) {
+        recordHarvest(family, false);
+        touch(tfcTick);
+        lastSimulatedDay = Math.max(lastSimulatedDay, currentDay);
+        sampleTrend();
+    }
+
+    private void recordHarvest(CropFamily family, boolean removePlant) {
         CropFamily actual = family == null ? CropFamily.OTHER : family;
-        cropCycles++;
+        cropCycles = increment(cropCycles);
         if (lastHarvestFamily.equals(actual.id())) {
-            continuousCropCycles++;
+            continuousCropCycles = increment(continuousCropCycles);
         } else {
             continuousCropCycles = 1;
             continuousPressure *= SoilConfig.HARVEST_ROTATION_RELIEF.get();
@@ -252,6 +293,7 @@ public final class SoilCell {
                 Math.max(0, continuousCropCycles - 1) * SoilConfig.CROP_PRESSURE_REPEAT.get());
         continuousPressure = unit(continuousPressure + cyclePressure);
 
+        if (!removePlant) return;
         CropFamilyDefinition familyDefinition = CropRegistry.familyDefinition(actual);
         residueReserve = unit(residueReserve + familyDefinition.residueReserve());
         profile = profile.adjust(
@@ -262,11 +304,12 @@ public final class SoilCell {
     }
 
     public void recordDisturbance(double compactionDelta, double structureDelta, long tfcTick, long currentDay, int y) {
-        disturbanceEvents++;
-        if (compactionDelta > 0) compactionEvents++;
+        disturbanceEvents = increment(disturbanceEvents);
+        if (compactionDelta > 0) compactionEvents = increment(compactionEvents);
         profile = profile.adjust(0, 0, 0, compactionDelta, structureDelta, -Math.abs(compactionDelta) * 0.10, 0);
         touch(tfcTick, y);
         lastSimulatedDay = Math.max(lastSimulatedDay, currentDay);
+        sampleTrend();
     }
 
     public void resetTo(SoilProfile newProfile, int y, long tfcTick, long currentDay) {
@@ -298,6 +341,9 @@ public final class SoilCell {
         lastAmendmentUnit = "";
         lastAmendmentConcentration = 1.0;
         simulationBaselinePending = false;
+        plantingKnownMask = plantingPresentMask = 0;
+        trend.clear();
+        sampleTrend();
     }
 
     void establishSimulationBaseline(long day, long tfcTick) {
@@ -319,12 +365,14 @@ public final class SoilCell {
         this.organicReserve = unit(organicReserve);
         this.residueReserve = unit(residueReserve);
         this.recentAmendmentLoad = Math.max(0, recentAmendmentLoad);
+        sampleTrend();
     }
 
     public void replaceProfile(SoilProfile newProfile, long tfcTick, long currentDay, int y) {
         this.profile = newProfile;
         this.sampleY = y;
         this.lastSimulatedDay = Math.max(lastSimulatedDay, currentDay);
+        sampleTrend();
         touch(tfcTick);
     }
 
@@ -335,6 +383,15 @@ public final class SoilCell {
         tag.putInt("cell_x", cellX);
         tag.putInt("cell_z", cellZ);
         tag.putInt("sample_y", sampleY);
+        if (texture != null) {
+            CompoundTag physical = new CompoundTag();
+            physical.putDouble("sand", texture.sand()); physical.putDouble("silt", texture.silt());
+            physical.putDouble("clay", texture.clay()); physical.putString("source", geologySource);
+            tag.put("physical", physical);
+        }
+        tag.putInt("planting_known", plantingKnownMask); tag.putInt("planting_present", plantingPresentMask);
+        tag.putBoolean("monitoring", monitoring);
+        if (monitoring) tag.put("trend", trend.save());
         tag.putDouble("organic_matter", profile.organicMatter());
         tag.putDouble("ph", profile.pH());
         tag.putDouble("drainage", profile.drainage());
@@ -386,6 +443,14 @@ public final class SoilCell {
         int sampleY = tag.contains("sample_y", Tag.TAG_INT) ? tag.getInt("sample_y") : 64;
         long simDay = tag.contains("last_simulated_day", Tag.TAG_LONG) ? tag.getLong("last_simulated_day") : 0L;
         SoilCell cell = new SoilCell(tag.getInt("cell_x"), tag.getInt("cell_z"), sampleY, profile, tag.getLong("last_tfc_tick"), simDay);
+        if (tag.contains("physical", Tag.TAG_COMPOUND)) {
+            CompoundTag physical = tag.getCompound("physical");
+            cell.initializePhysical(new SoilTexture(physical.getDouble("sand"), physical.getDouble("silt"), physical.getDouble("clay")), physical.getString("source"));
+        }
+        cell.plantingKnownMask = tag.getInt("planting_known") & 0xffff;
+        cell.plantingPresentMask = tag.getInt("planting_present") & cell.plantingKnownMask;
+        cell.monitoring = tag.getBoolean("monitoring");
+        if (cell.monitoring) cell.trend.load(tag.getList("trend", Tag.TAG_COMPOUND));
         cell.amendmentApplications = nonNegative(tag.getInt("amendment_applications"));
         cell.cropCycles = nonNegative(tag.getInt("crop_cycles"));
         cell.continuousCropCycles = nonNegative(tag.getInt("continuous_crop_cycles"));
@@ -395,32 +460,37 @@ public final class SoilCell {
         cell.disturbanceEvents = nonNegative(tag.getInt("disturbance_events"));
         cell.waterloggingEvents = nonNegative(tag.getInt("waterlogging_events"));
         cell.compactionEvents = nonNegative(tag.getInt("compaction_events"));
-        cell.activePlantings = nonNegative(tag.getInt("active_plantings"));
+        cell.activePlantings = Math.min(16, nonNegative(tag.getInt("active_plantings")));
         cell.currentCropFamily = tag.getString("current_crop_family");
         cell.lastHarvestFamily = tag.getString("last_harvest_family");
         cell.continuousPressure = unit(tag.getDouble("continuous_pressure"));
         cell.organicReserve = unit(tag.getDouble("organic_reserve"));
-        cell.organicReserveRate = tag.contains("organic_reserve_rate", Tag.TAG_DOUBLE) ? Math.max(0, tag.getDouble("organic_reserve_rate")) : 0.030;
+        cell.organicReserveRate = tag.contains("organic_reserve_rate", Tag.TAG_DOUBLE) ? finiteNonNegative(tag.getDouble("organic_reserve_rate")) : 0.030;
         cell.residueReserve = unit(tag.getDouble("residue_reserve"));
-        cell.recentAmendmentLoad = Math.max(0, tag.getDouble("recent_amendment_load"));
-        if (tag.contains("pending_amendments", Tag.TAG_LIST)) {
-            ListTag pending = tag.getList("pending_amendments", Tag.TAG_COMPOUND);
+        cell.recentAmendmentLoad = finiteNonNegative(tag.getDouble("recent_amendment_load"));
+        if (tag.contains("pending_amendments")) {
+            ListTag pending = com.foundations.soil.storage.SavedTagChecks.compounds(tag, "pending_amendments", false);
+            if (pending.size() > 256) throw new IllegalStateException("Oversized persisted amendment queue");
             for (int i = 0; i < pending.size(); i++) {
-                try { cell.pendingAmendments.add(PendingAmendmentEffect.load(pending.getCompound(i))); }
-                catch (RuntimeException ignored) { /* malformed residue is skipped rather than corrupting the whole cell */ }
+                cell.pendingAmendments.add(PendingAmendmentEffect.load(pending.getCompound(i)));
             }
         }
         cell.lastAmendmentId = tag.getString("last_amendment_id");
         cell.lastAmendmentDay = tag.contains("last_amendment_day", Tag.TAG_LONG) ? tag.getLong("last_amendment_day") : -1L;
-        cell.lastAmendmentAmount = tag.getDouble("last_amendment_amount");
+        cell.lastAmendmentAmount = finiteNonNegative(tag.getDouble("last_amendment_amount"));
         cell.lastAmendmentUnit = tag.getString("last_amendment_unit");
         cell.lastAmendmentConcentration = tag.contains("last_amendment_concentration", Tag.TAG_DOUBLE)
-            ? Math.max(0, tag.getDouble("last_amendment_concentration")) : 1.0;
-        // Only 1a cells need the one-time Living Soil baseline. 2a cells migrate directly into model/schema 3.
+            ? finiteNonNegative(tag.getDouble("last_amendment_concentration")) : 1.0;
+        // Only 1a cells need the one-time Living Soil baseline. 2a/3a cells migrate while retaining their existing seven soil statistics.
         cell.simulationBaselinePending = schema < 2 || model < 2;
         return cell;
     }
 
     private static int nonNegative(int value) { return Math.max(0, value); }
-    private static double unit(double value) { return Math.max(0.0, Math.min(1.0, value)); }
+    private static double unit(double value) { return Math.min(1.0, finiteNonNegative(value)); }
+    private static int increment(int value) { return value == Integer.MAX_VALUE ? value : value + 1; }
+    private static double finiteNonNegative(double value) {
+        if (!Double.isFinite(value)) throw new IllegalArgumentException("Non-finite soil state");
+        return Math.max(0, value);
+    }
 }

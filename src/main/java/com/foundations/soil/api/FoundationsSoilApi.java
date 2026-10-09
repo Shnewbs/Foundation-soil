@@ -17,9 +17,9 @@ import net.minecraft.server.level.ServerLevel;
 
 /** Stable public entry point for Foundations Soil integrations. */
 public final class FoundationsSoilApi {
-    public static final String API_VERSION = "0.0.2";
-    /** Contract v2 adds normalized solid/liquid amendment dosing while preserving v1 helpers. */
-    public static final int CONTRACT_VERSION = 2;
+    public static final String API_VERSION = "0.1.0";
+    /** Contract v3 adds immutable physical observations and genotype-independent tolerance inputs. */
+    public static final int CONTRACT_VERSION = 3;
 
     private static final SoilService SERVICE = new DefaultSoilService();
     private static final SoilScriptGateway SCRIPTING = new SoilScriptGateway(SERVICE);
@@ -36,6 +36,28 @@ public final class FoundationsSoilApi {
 
     public static Optional<SoilSnapshot> peek(ServerLevel level, BlockPos soilPos) {
         return SERVICE.peek(level, soilPos);
+    }
+
+    /** Server-thread-only, read-only: no cell creation, simulation, or chunk loading. */
+    public static Optional<SoilPhysicalSnapshot> physicalSnapshot(ServerLevel level, BlockPos soilPos) {
+        requireServerRead(level, soilPos);
+        return com.foundations.soil.soil.SoilManager.peek(level, soilPos).map(cell -> new SoilPhysicalSnapshot(
+            SoilSnapshots.from(cell), cell.physicalInitialized() ? Optional.of(cell.texture()) : Optional.empty(),
+            cell.geologySource(), cell.trend().points()));
+    }
+
+    /** Callers supply TFC hydration normalized to [0,1], not a second stored water resource. */
+    public static Optional<SoilResponse> evaluateTraits(ServerLevel level, BlockPos soilPos, String cropId,
+                                                       SoilTraits traits, double tfcHydration) {
+        requireServerRead(level, soilPos);
+        ResourceLocation id = ResourceLocation.tryParse(cropId);
+        if (id == null) throw new IllegalArgumentException("Invalid crop id");
+        return com.foundations.soil.soil.SoilManager.peek(level, soilPos).map(cell -> SoilResponse.evaluate(cell.profile(),
+            cell.texture(), com.foundations.soil.crop.CropRegistry.resolve(id), traits, tfcHydration, cell.continuousPressure()));
+    }
+    private static void requireServerRead(ServerLevel level, BlockPos pos) {
+        if (level == null || pos == null || !level.getServer().isSameThread())
+            throw new IllegalStateException("Soil world reads must run on the Minecraft server thread");
     }
 
     public static SoilSnapshot getOrCreate(ServerLevel level, BlockPos soilPos) {

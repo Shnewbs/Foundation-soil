@@ -20,13 +20,17 @@ public final class SoilInitializer {
         double jitter = (((h >>> 11) & 0xffff) / 65535.0) - 0.5;
         double jitter2 = (((h >>> 29) & 0xffff) / 65535.0) - 0.5;
 
+        double rain = net.dries007.tfc.util.climate.Climate.getAverageRainfall(level, soilPos);
+        double temperature = net.dries007.tfc.util.climate.Climate.getAverageTemperature(level, soilPos);
+        double rainOffset = Double.isFinite(rain) ? Math.max(-1, Math.min(1, (rain - 250) / 250)) : 0;
+        double temperatureOffset = Double.isFinite(temperature) ? Math.max(-1, Math.min(1, (temperature - 15) / 25)) : 0;
         return new SoilProfile(
-            base.organicMatter() + jitter * definition.organicMatterJitter(),
-            base.pH() + jitter2 * definition.pHJitter(),
+            base.organicMatter() + jitter * definition.organicMatterJitter() + .035 * rainOffset - .015 * temperatureOffset,
+            base.pH() + jitter2 * definition.pHJitter() - .15 * rainOffset,
             base.drainage() + jitter * definition.drainageJitter(),
             base.compaction() - jitter * definition.compactionJitter(),
             base.structure() + jitter2 * definition.structureJitter(),
-            base.biology() + jitter * definition.biologyJitter(),
+            base.biology() + jitter * definition.biologyJitter() + .025 * rainOffset,
             base.salinity() + Math.max(0, jitter2) * definition.salinityJitter()
         );
     }

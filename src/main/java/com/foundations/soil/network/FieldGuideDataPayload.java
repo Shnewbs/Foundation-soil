@@ -27,11 +27,11 @@ public record FieldGuideDataPayload(
     int applicationsPerBag,
     long currentTfcDay,
     int totalCells,
-    boolean truncated
+    boolean truncated, int fieldOffset, int cellOffset, int totalFields
 ) implements CustomPacketPayload {
-    private static final int HARD_MAX_SYNC_CELLS = 2048;
-    private static final int HARD_MAX_SYNC_FIELDS = 512;
-    private static final int HARD_MAX_EVENTS_PER_CELL = 16;
+    public static final int HARD_MAX_SYNC_CELLS = 64;
+    public static final int HARD_MAX_SYNC_FIELDS = 128;
+    private static final int HARD_MAX_EVENTS_PER_CELL = 8;
     private static final int HARD_MAX_AMENDMENTS = 64;
 
     public static final Type<FieldGuideDataPayload> TYPE = new Type<>(
@@ -41,15 +41,15 @@ public record FieldGuideDataPayload(
     public static final StreamCodec<RegistryFriendlyByteBuf, FieldGuideDataPayload> STREAM_CODEC = new StreamCodec<>() {
         @Override
         public FieldGuideDataPayload decode(RegistryFriendlyByteBuf buffer) {
-            int fieldCount = Math.min(HARD_MAX_SYNC_FIELDS, buffer.readVarInt());
+            int fieldCount = NetworkBounds.count(buffer.readVarInt(), HARD_MAX_SYNC_FIELDS);
             ArrayList<FieldView> fields = new ArrayList<>(fieldCount);
             for (int i = 0; i < fieldCount; i++) fields.add(FieldView.decode(buffer));
 
-            int cellCount = Math.min(HARD_MAX_SYNC_CELLS, buffer.readVarInt());
+            int cellCount = NetworkBounds.count(buffer.readVarInt(), HARD_MAX_SYNC_CELLS);
             ArrayList<CellView> cells = new ArrayList<>(cellCount);
             for (int i = 0; i < cellCount; i++) cells.add(CellView.decode(buffer));
 
-            int amendmentCount = Math.min(HARD_MAX_AMENDMENTS, buffer.readVarInt());
+            int amendmentCount = NetworkBounds.count(buffer.readVarInt(), HARD_MAX_AMENDMENTS);
             ArrayList<AmendmentView> amendments = new ArrayList<>(amendmentCount);
             for (int i = 0; i < amendmentCount; i++) amendments.add(AmendmentView.decode(buffer));
 
@@ -60,7 +60,7 @@ public record FieldGuideDataPayload(
             int totalCells = buffer.readVarInt();
             boolean truncated = buffer.readBoolean();
             return new FieldGuideDataPayload(List.copyOf(fields), List.copyOf(cells), List.copyOf(amendments),
-                warnings, preset, applicationsPerBag, currentTfcDay, totalCells, truncated);
+                warnings, preset, applicationsPerBag, currentTfcDay, totalCells, truncated, buffer.readVarInt(), buffer.readVarInt(), buffer.readVarInt());
         }
 
         @Override
@@ -77,24 +77,42 @@ public record FieldGuideDataPayload(
             buffer.writeVarLong(payload.currentTfcDay());
             buffer.writeVarInt(payload.totalCells());
             buffer.writeBoolean(payload.truncated());
+            buffer.writeVarInt(payload.fieldOffset()); buffer.writeVarInt(payload.cellOffset()); buffer.writeVarInt(payload.totalFields());
         }
     };
 
-    public static FieldGuideDataPayload from(ServerPlayer player) {
+    public FieldGuideDataPayload {
+        fields = List.copyOf(fields); cells = List.copyOf(cells); amendments = List.copyOf(amendments);
+        NetworkBounds.count(fields.size(), HARD_MAX_SYNC_FIELDS); NetworkBounds.count(cells.size(), HARD_MAX_SYNC_CELLS);
+        NetworkBounds.count(amendments.size(), HARD_MAX_AMENDMENTS);
+        if (fieldOffset < 0 || cellOffset < 0 || totalFields < 0 || totalCells < 0) throw new IllegalArgumentException("Invalid ledger page metadata");
+    }
+
+    public FieldGuideDataPayload(List<FieldView> fields, List<CellView> cells, List<AmendmentView> amendments,
+            WarningView warnings, String preset, int applicationsPerBag, long currentTfcDay, int totalCells, boolean truncated) {
+        this(fields, cells, amendments, warnings, preset, applicationsPerBag, currentTfcDay, totalCells, truncated, 0, 0, fields.size());
+    }
+
+    public static FieldGuideDataPayload from(ServerPlayer player) { return from(player, 0, 0); }
+    public static FieldGuideDataPayload from(ServerPlayer player, int requestedFields, int requestedCells) {
         int maxFields = Math.min(HARD_MAX_SYNC_FIELDS, SoilConfig.LEDGER_MAX_SYNC_FIELDS.get());
         int maxCells = Math.min(HARD_MAX_SYNC_CELLS, SoilConfig.LEDGER_MAX_SYNC_CELLS.get());
         int maxEvents = Math.min(HARD_MAX_EVENTS_PER_CELL, SoilConfig.LEDGER_EVENTS_PER_CELL_SYNC.get());
 
         List<FieldLedgerField> rawFields = FieldLedgerManager.fields(player);
+        List<FieldLedgerEntry> rawCells = FieldLedgerManager.entries(player);
+        int fieldOffset = NetworkBounds.pageOffset(requestedFields, rawFields.size(), maxFields);
+        int cellOffset = NetworkBounds.pageOffset(requestedCells, rawCells.size(), maxCells);
+        java.util.Map<Integer, Integer> memberCounts = new java.util.HashMap<>();
+        for (FieldLedgerEntry entry : rawCells) memberCounts.merge(entry.fieldId(), 1, Integer::sum);
         ArrayList<FieldView> fields = new ArrayList<>();
-        for (int i = 0; i < Math.min(maxFields, rawFields.size()); i++) {
+        for (int i = fieldOffset; i < Math.min(fieldOffset + maxFields, rawFields.size()); i++) {
             FieldLedgerField field = rawFields.get(i);
-            fields.add(new FieldView(field.id(), field.name(), field.note(), field.favorite(), FieldLedgerManager.fieldMembers(player, field.id())));
+            fields.add(new FieldView(field.id(), field.name(), field.note(), field.favorite(), memberCounts.getOrDefault(field.id(), 0)));
         }
 
-        List<FieldLedgerEntry> rawCells = FieldLedgerManager.entries(player);
         ArrayList<CellView> cells = new ArrayList<>();
-        for (int i = 0; i < Math.min(maxCells, rawCells.size()); i++) cells.add(CellView.from(rawCells.get(i), maxEvents));
+        for (int i = cellOffset; i < Math.min(cellOffset + maxCells, rawCells.size()); i++) cells.add(CellView.from(rawCells.get(i), maxEvents));
 
         ArrayList<AmendmentView> amendments = new ArrayList<>();
         double strength = SoilConfig.effectiveAmendmentStrength();
@@ -104,7 +122,8 @@ public record FieldGuideDataPayload(
 
         return new FieldGuideDataPayload(List.copyOf(fields), List.copyOf(cells), List.copyOf(amendments),
             WarningView.server(), SoilConfig.preset(), SoilConfig.APPLICATIONS_PER_BAG.get(),
-            Math.max(0L, Calendars.SERVER.getTotalCalendarDays()), rawCells.size(), rawCells.size() > cells.size());
+            Math.max(0L, Calendars.SERVER.getTotalCalendarDays()), rawCells.size(),
+            rawCells.size() > cells.size() || rawFields.size() > fields.size(), fieldOffset, cellOffset, rawFields.size());
     }
 
     @Override
@@ -247,7 +266,7 @@ public record FieldGuideDataPayload(
             int pendingAmendmentCount = buffer.readVarInt();
             double pendingAmendmentDaysRemaining = buffer.readDouble();
             double recentAmendmentLoad = buffer.readDouble();
-            int eventCount = Math.min(HARD_MAX_EVENTS_PER_CELL, buffer.readVarInt());
+            int eventCount = NetworkBounds.count(buffer.readVarInt(), HARD_MAX_EVENTS_PER_CELL);
             ArrayList<String> events = new ArrayList<>(eventCount);
             for (int i = 0; i < eventCount; i++) events.add(buffer.readUtf(160));
             return new CellView(dimension, cellX, cellZ, sampleY, lastScannedDay, favorite, note, fieldId,
@@ -302,10 +321,12 @@ public record FieldGuideDataPayload(
             buffer.writeVarInt(pendingAmendmentCount);
             buffer.writeDouble(pendingAmendmentDaysRemaining);
             buffer.writeDouble(recentAmendmentLoad);
+            NetworkBounds.count(recentEvents.size(), HARD_MAX_EVENTS_PER_CELL);
             buffer.writeVarInt(recentEvents.size());
             for (String event : recentEvents) buffer.writeUtf(event, 160);
         }
 
+        public String key() { return com.foundations.soil.ledger.FieldLedgerEntry.key(dimension, cellX, cellZ); }
         public int centerX() { return cellX * 4 + 2; }
         public int centerZ() { return cellZ * 4 + 2; }
         public int chunkX() { return Math.floorDiv(centerX(), 16); }

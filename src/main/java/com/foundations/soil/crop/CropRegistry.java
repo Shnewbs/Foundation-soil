@@ -104,7 +104,13 @@ public final class CropRegistry {
     }
 
     public static boolean isMature(BlockState state) {
-        return !(state.getBlock() instanceof net.minecraft.world.level.block.CropBlock crop) || crop.isMaxAge(state);
+        if (state.getBlock() instanceof net.minecraft.world.level.block.CropBlock crop) return crop.isMaxAge(state);
+        // Fallback for callers without a block entity: unknown maturity must not award a harvest.
+        for (var property : state.getProperties()) {
+            if (property instanceof net.minecraft.world.level.block.state.properties.IntegerProperty age && age.getName().equals("age"))
+                return state.getValue(age).equals(age.getPossibleValues().stream().max(Integer::compareTo).orElse(Integer.MAX_VALUE));
+        }
+        return false;
     }
 
     public static CropFamily inferFamily(ResourceLocation id) {

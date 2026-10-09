@@ -1,3 +1,13 @@
+# Beta Field Guide and Laboratory workflow
+
+In 0.1.0-beta, use **New field** to create a plot. Select a discovered cell and **Edit** to assign its field, note and favorite. Select a field and Edit to rename it or change notes/favorites. Deletion requires confirmation and preserves discovered cells and their notes. Every edit is applied to the authenticated player's ledger and displayed only after server acknowledgement.
+
+The right detail pane wraps and scrolls independently with the mouse wheel, scroll thumb, Page Up/Down and Home/End. Search applies to the current server page; use paging arrows for further records. A field summary drawn from a partial guide page is labeled as a subset. The craftable **Soil Laboratory** compares two own-cell or own-field records and uses every field member for its snapshot averages without loading distant chunks. TFC probe timestamps, soil-update times and observed trend gaps remain explicit.
+
+The command reference below remains available. Manual GUI-scale and multiplayer acceptance is still pending.
+
+---
+
 # Foundations Field Ledger — 0.0.3a.R6
 
 The Field Ledger is a **player-facing index and history layer** over Foundations Soil. It does **not** replace or duplicate the authoritative Soil Cell database.

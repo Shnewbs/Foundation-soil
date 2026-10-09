@@ -26,5 +26,7 @@
   "block.foundations_soil.manure_slurry": "Manure Slurry",
   "block.foundations_soil.lime_suspension": "Lime Suspension",
   "block.foundations_soil.sulfur_suspension": "Sulfur Suspension",
-  "block.foundations_soil.biochar_suspension": "Biochar Suspension"
+  "block.foundations_soil.biochar_suspension": "Biochar Suspension",
+  "block.foundations_soil.soil_laboratory": "Soil Laboratory",
+  "screen.foundations_soil.laboratory": "Soil Laboratory"
 }

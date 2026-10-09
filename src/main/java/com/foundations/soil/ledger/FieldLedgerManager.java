@@ -22,13 +22,25 @@ import net.minecraft.world.level.saveddata.SavedData;
 public final class FieldLedgerManager {
     private FieldLedgerManager() {}
 
-    private static final SavedData.Factory<FieldLedgerData> FACTORY =
-        new SavedData.Factory<>(FieldLedgerData::new, FieldLedgerData::load);
-
     private static FieldLedgerData data(MinecraftServer server) {
         ServerLevel root = server.getLevel(Level.OVERWORLD);
         if (root == null) throw new IllegalStateException("Overworld unavailable for Foundations Field Ledger storage");
-        return root.getDataStorage().computeIfAbsent(FACTORY, FieldLedgerData.DATA_NAME);
+        return com.foundations.soil.storage.SafeSavedData.get(root, FieldLedgerData.DATA_NAME, FieldLedgerData::new, FieldLedgerData::load);
+    }
+
+    public static List<String> laboratoryReport(ServerPlayer player, LaboratorySelection selection) {
+        return SoilLaboratoryReports.describe(data(player.serverLevel().getServer()).ledger(player.getUUID()), selection);
+    }
+
+    public static LedgerMutation.Result mutate(ServerPlayer player, LedgerMutation mutation) {
+        FieldLedgerData worldData = data(player.serverLevel().getServer());
+        LedgerMutation.Result result = mutation.apply(worldData.ledger(player.getUUID()));
+        if (result.success()) {
+            worldData.setDirty();
+            SoilEvents.bus().post(new SoilEvents.FieldUpdated(player.getUUID(), "", 0, 0, mutation.fieldId(),
+                "gui:" + mutation.action().name().toLowerCase(java.util.Locale.ROOT)));
+        }
+        return result;
     }
 
     public static FieldLedgerEntry scan(ServerPlayer player, ServerLevel level, BlockPos soilPos, SoilCell cell) {
@@ -37,6 +49,7 @@ public final class FieldLedgerManager {
         String dimension = level.dimension().location().toString();
         String key = FieldLedgerEntry.key(dimension, cell.cellX(), cell.cellZ());
         boolean isNew = ledger.entry(key).isEmpty();
+        SoilManager.enableMonitoring(level, cell);
         FieldLedgerEntry entry = ledger.discover(dimension, cell.cellX(), cell.cellZ(), cell.sampleY(), Calendars.SERVER.getTicks());
         entry.refresh(cell, Calendars.SERVER.getTicks(), Calendars.SERVER.getTotalCalendarDays());
         entry.refreshTfc(level, soilPos);

@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.foundations.soil.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "TfcCropYieldMixin",
+    "TfcPickingHarvestMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

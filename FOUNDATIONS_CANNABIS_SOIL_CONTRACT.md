@@ -1,3 +1,9 @@
+# Current Soil API contract: 3
+
+0.1.0-beta adds immutable physical snapshots and abstract tolerance-based soil responses while preserving existing Java/service helpers. See [API contract 3](docs/beta/INTEGRATION_CONTRACT.md) for authoritative usage and boundaries. The earlier contract below remains historical reference, not a claim of a native KubeJS plugin or completed Genetics/Cannabis integration. Actual adapter/pack testing remains required; Soil does not store genomes or replace TFC water and nutrients.
+
+---
+
 # Foundations Cannabis ↔ Foundations Soil Contract
 
 Foundations Cannabis should consume Soil through the public `FoundationsSoilApi` / `SoilService` contract, never by reaching into `com.foundations.soil.soil` internals.

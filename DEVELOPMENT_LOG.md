@@ -1,3 +1,11 @@
+# 0.1.0-beta integration - 2026-10-08 Pacific / 2026-10-09 UTC
+
+Implemented the intervening roadmap packages in one beta source change. Local Java 21 compilation and 70 standalone automated tests passed against the genuine pinned dependency classpath; 1k/10k/50k compressed cell round trips passed. The native GitHub build/release gate repeats compile/test/benchmark before publication. These are model/storage results, not a successful full-modpack launch.
+
+The genuine Framework Library record could not be materialized for this runtime. Framework remains a hard dependency; no stub or optional fallback was introduced. In-game Mixin transformation, crop balance, UI, multiplayer, actual world migration and optional-integration acceptance remain explicitly open in [VALIDATION.md](docs/beta/VALIDATION.md). The 26.3 port is not claimed as delivered.
+
+---
+
 # 2026-09-22 — 0.0.3a.R5 TFC Probe parity
 
 R5 makes the Soil Probe the complete diagnostic tool while keeping the normal hoe path lightweight. The live Probe HUD and Field Ledger now share one `TfcSoilSnapshot` capture path.

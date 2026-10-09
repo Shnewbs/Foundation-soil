@@ -42,9 +42,5 @@ public final class FieldLedgerField {
         return field;
     }
 
-    private static String clean(String value, int max) {
-        if (value == null) return "";
-        String normalized = value.replace('\n', ' ').replace('\r', ' ').trim();
-        return normalized.length() <= max ? normalized : normalized.substring(0, max);
-    }
+    private static String clean(String value, int max) { return LedgerText.clean(value, max); }
 }

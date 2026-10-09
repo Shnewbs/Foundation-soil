@@ -42,6 +42,7 @@ public final class SoilItems {
         .displayItems((params, output) -> {
             output.accept(FIELD_GUIDE.get());
             output.accept(SOIL_PROBE.get());
+            output.accept(SoilBlocks.LABORATORY_ITEM.get());
             output.accept(EMPTY_AMENDMENT_BAG.get());
             output.accept(LIME_BAG.get());
             output.accept(SULFUR_BAG.get());

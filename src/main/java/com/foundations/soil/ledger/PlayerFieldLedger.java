@@ -12,6 +12,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 public final class PlayerFieldLedger {
+    public static final int MAX_FIELDS = 4096;
     private final Map<String, FieldLedgerEntry> entries = new LinkedHashMap<>();
     private final Map<Integer, FieldLedgerField> fields = new LinkedHashMap<>();
     private int nextFieldId = 1;
@@ -38,6 +39,8 @@ public final class PlayerFieldLedger {
     }
 
     public FieldLedgerField createField(String name) {
+        if (fields.size() >= MAX_FIELDS || nextFieldId <= 0 || nextFieldId == Integer.MAX_VALUE)
+            throw new IllegalStateException("Field capacity exhausted; existing records have been preserved.");
         int id = nextFieldId++;
         FieldLedgerField field = new FieldLedgerField(id, name);
         fields.put(id, field);
@@ -70,19 +73,19 @@ public final class PlayerFieldLedger {
 
     public static PlayerFieldLedger load(CompoundTag tag) {
         PlayerFieldLedger ledger = new PlayerFieldLedger();
-        ListTag entries = tag.getList("entries", Tag.TAG_COMPOUND);
+        ListTag entries = com.foundations.soil.storage.SavedTagChecks.compounds(tag, "entries", true);
         for (int i = 0; i < entries.size(); i++) {
             FieldLedgerEntry entry = FieldLedgerEntry.load(entries.getCompound(i));
-            ledger.entries.put(entry.key(), entry);
+            if (ledger.entries.putIfAbsent(entry.key(), entry) != null) throw new IllegalStateException("Duplicate saved ledger cell");
         }
-        ListTag fields = tag.getList("fields", Tag.TAG_COMPOUND);
+        ListTag fields = com.foundations.soil.storage.SavedTagChecks.compounds(tag, "fields", false);
         int maxId = 0;
         for (int i = 0; i < fields.size(); i++) {
             FieldLedgerField field = FieldLedgerField.load(fields.getCompound(i));
-            ledger.fields.put(field.id(), field);
+            if (field.id() <= 0 || ledger.fields.putIfAbsent(field.id(), field) != null) throw new IllegalStateException("Invalid or duplicate saved field ID");
             maxId = Math.max(maxId, field.id());
         }
-        ledger.nextFieldId = Math.max(maxId + 1, Math.max(1, tag.getInt("next_field_id")));
+        ledger.nextFieldId = maxId == Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max(maxId + 1, Math.max(1, tag.getInt("next_field_id")));
         // Clear orphaned memberships rather than silently pointing at a deleted/nonexistent field.
         for (FieldLedgerEntry entry : ledger.entries.values()) {
             if (entry.fieldId() != 0 && !ledger.fields.containsKey(entry.fieldId())) entry.setFieldId(0);

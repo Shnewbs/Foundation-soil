@@ -41,3 +41,6 @@ type="required"
 versionRange="${framework_version_range}"
 ordering="AFTER"
 side="BOTH"
+
+[[mixins]]
+config="foundations_soil.mixins.json"

@@ -1,3 +1,16 @@
+# 0.1.0-beta configuration additions
+
+```toml
+[crop_response]
+tfc_yield_response_strength = 0.5
+```
+
+Range 0.0-1.0. Zero disables Soil's yield adjustment; one applies the full response to newly accumulated TFC yield. Previous yield, crop growth/expiry, stored N/P/K and TFC hydration are not rewritten. The default is a gameplay balance value requiring seasonal pack testing.
+
+Protocol 8 applies hard per-message caps of 64 cells, 128 fields and eight event rows per cell even when historical settings below permit larger limits. Paging provides access to additional records. A monitored cell keeps at most 16 observed TFC-day trend endpoints; gaps are not fabricated. Input text limits are 64 characters for field names and 256 for notes. The existing seven-stat and time-scale configuration remains available below.
+
+---
+
 # Foundations Soil 0.0.3a — Configuration Reference
 
 ## Server-authoritative TOML

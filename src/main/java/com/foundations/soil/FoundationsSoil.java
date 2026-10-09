@@ -20,11 +20,12 @@ import org.slf4j.Logger;
 @Mod(FoundationsSoil.MOD_ID)
 public final class FoundationsSoil {
     public static final String MOD_ID = "foundations_soil";
-    public static final String VERSION = "0.0.3a.R6";
+    public static final String VERSION = "0.1.0-beta";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public FoundationsSoil(IEventBus modBus, ModContainer container) {
         SoilFluids.register(modBus);
+        com.foundations.soil.registry.SoilBlocks.register(modBus);
         SoilItems.register(modBus);
         modBus.addListener(SoilNetwork::register);
         modBus.addListener(this::commonSetup);

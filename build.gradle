@@ -60,7 +60,7 @@ dependencies {
     }
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.junit.platform:junit-platform-launcher'
 }
 
 if (!modRuntimeTests) {
@@ -97,4 +97,18 @@ tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 tasks.withType(AbstractArchiveTask).configureEach {
     preserveFileTimestamps = false
     reproducibleFileOrder = true
+}
+
+// This benchmark exercises model/storage code, not a running Minecraft server.
+tasks.register('soilScaleBenchmark', JavaExec) {
+    group = 'verification'
+    description = 'Model/storage microbenchmark; not a live-server TPS test.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.foundations.soil.SoilScaleBenchmark'
+    maxHeapSize = '1500m'
+    args layout.buildDirectory.file('reports/soil-scale-benchmark.json').get().asFile.absolutePath
+    if (modRuntimeTests) {
+        enabled = false
+    }
 }

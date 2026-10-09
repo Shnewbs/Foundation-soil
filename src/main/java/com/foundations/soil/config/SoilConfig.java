@@ -6,6 +6,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 public final class SoilConfig {
     public static final ModConfigSpec SPEC;
 
+    public static final ModConfigSpec.DoubleValue TFC_YIELD_RESPONSE_STRENGTH;
     public static final ModConfigSpec.ConfigValue<String> PRESET;
     public static final ModConfigSpec.BooleanValue DAILY_UPDATES;
     public static final ModConfigSpec.IntValue SIMULATION_BATCH_SIZE;
@@ -54,6 +55,11 @@ public final class SoilConfig {
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
 
+        b.push("crop_response");
+        TFC_YIELD_RESPONSE_STRENGTH = b.comment("Blend applied only to newly accumulated TFC crop yield. 0 disables the bridge; 1 applies the full Soil response.",
+            "Does not replace TFC growth, expiry, hydration, or stored N/P/K. Native pack/API compatibility testing is still required for beta.")
+            .defineInRange("tfc_yield_response_strength", 0.5, 0.0, 1.0);
+        b.pop();
         b.push("balance");
         PRESET = b.comment(
                 "High-level balance preset. Supported values: realistic, balanced, accelerated_testing.",

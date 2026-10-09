@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "GGG",
+    "PHP",
+    "BBB"
+  ],
+  "key": {
+    "G": {
+      "item": "minecraft:glass"
+    },
+    "P": {
+      "tag": "minecraft:planks"
+    },
+    "H": {
+      "item": "foundations_soil:soil_probe"
+    },
+    "B": {
+      "item": "tfc:metal/ingot/brass"
+    }
+  },
+  "result": {
+    "id": "foundations_soil:soil_laboratory",
+    "count": 1
+  }
+}
