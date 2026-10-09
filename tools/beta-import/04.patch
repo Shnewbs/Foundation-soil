@@ -1,0 +1,329 @@
+diff --git a/src/main/java/com/foundations/soil/client/LaboratoryScreen.java b/src/main/java/com/foundations/soil/client/LaboratoryScreen.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1aa032ea69c1037139c4d12dcb7ae1ce5f124cef
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/client/LaboratoryScreen.java
+@@ -0,0 +1,164 @@
++package com.foundations.soil.client;
++
++import com.foundations.soil.ledger.LaboratorySelection;
++import com.foundations.soil.network.*;
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++import java.util.UUID;
++import net.minecraft.client.gui.GuiGraphics;
++import net.minecraft.client.gui.components.Button;
++import net.minecraft.client.gui.components.EditBox;
++import net.minecraft.client.gui.screens.Screen;
++import net.minecraft.network.chat.Component;
++import net.minecraft.util.FormattedCharSequence;
++import net.neoforged.neoforge.network.PacketDistributor;
++
++/** Two independent, wrapped report viewports. All reports are authenticated server snapshots. */
++public final class LaboratoryScreen extends Screen {
++    private final long position;
++    private FieldGuideDataPayload data;
++    private final LaboratorySelection[] selected = {LaboratorySelection.none(), LaboratorySelection.none()};
++    private final String[] labels = {"Choose a cell or field", "Choose a cell or field"};
++    private final String[] filters = {"", ""};
++    private final DetailScroll[] scroll = {new DetailScroll(), new DetailScroll()};
++    private List<String> first = List.of("Probe soil and assign fields in the Field Guide before comparing them.");
++    private List<String> second = List.of("Reports never load distant chunks or inspect another player's records.");
++    private UUID pending;
++    private int waitTicks, activePane, dragging = -1;
++    private double dragGrab;
++    private String status = "Snapshot analysis; TFC remains authoritative for nutrients and hydration.";
++    private Button analyze;
++    private int columnWidth, top, bottom;
++
++    public LaboratoryScreen(LaboratoryOpenPayload payload) {
++        super(Component.translatable("screen.foundations_soil.laboratory"));
++        position = payload.position(); data = payload.ledger();
++    }
++    @Override protected void init() {
++        columnWidth = Math.max(80, (width - 30) / 2); top = 91; bottom = Math.max(top + 20, height - 59);
++        for (int i = 0; i < 2; i++) {
++            final int pane = i; int x = left(i);
++            EditBox search = new EditBox(font, x, 26, columnWidth, 18, Component.literal("Filter your current records"));
++            search.setMaxLength(64); search.setValue(filters[i]);
++            search.setResponder(value -> filters[pane] = value); addRenderableWidget(search);
++            addRenderableWidget(Button.builder(Component.literal("<"), b -> choose(pane, -1)).bounds(x, 47, 20, 18).build());
++            addRenderableWidget(Button.builder(Component.literal("Next matching record"), b -> choose(pane, 1))
++                .bounds(x + 23, 47, Math.max(40, columnWidth - 23), 18).build());
++        }
++        int y = height - 53;
++        addRenderableWidget(Button.builder(Component.literal("Fields <"), b -> page(true, -1)).bounds(10, y, 66, 18).build());
++        addRenderableWidget(Button.builder(Component.literal("Fields >"), b -> page(true, 1)).bounds(78, y, 66, 18).build());
++        addRenderableWidget(Button.builder(Component.literal("Cells <"), b -> page(false, -1)).bounds(146, y, 60, 18).build());
++        addRenderableWidget(Button.builder(Component.literal("Cells >"), b -> page(false, 1)).bounds(208, y, 60, 18).build());
++        analyze = addRenderableWidget(Button.builder(Component.literal("Analyze"), b -> query()).bounds(10, height - 32, 68, 20).build());
++        addRenderableWidget(Button.builder(Component.literal("Copy report"), b -> {
++            if (minecraft != null) minecraft.keyboardHandler.setClipboard(String.join("\n", first) + "\n\n--- Comparison ---\n\n" + String.join("\n", second));
++        }).bounds(81, height - 32, 90, 20).build());
++        addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose()).bounds(Math.max(175, width - 70), height - 32, 60, 20).build());
++        analyze.active = pending == null;
++    }
++    private int left(int pane) { return 10 + pane * (columnWidth + 10); }
++    private record Choice(LaboratorySelection value, String label) {}
++    private List<Choice> choices(int pane) {
++        String search = filters[pane].strip().toLowerCase(Locale.ROOT);
++        ArrayList<Choice> result = new ArrayList<>();
++        for (var f : data.fields()) result.add(new Choice(new LaboratorySelection(true, "", f.id()), "Field #" + f.id() + ": " + f.name()));
++        for (var c : data.cells()) result.add(new Choice(new LaboratorySelection(false, c.key(), 0), c.dimension() + " [" + c.cellX() + ", " + c.cellZ() + "]"));
++        return result.stream().filter(c -> c.label().toLowerCase(Locale.ROOT).contains(search)).toList();
++    }
++    private void choose(int pane, int direction) {
++        var list = choices(pane);
++        if (list.isEmpty()) { status = "No matching records on this page. Use Fields/Cells paging or change the filter."; return; }
++        int index = -1;
++        for (int i = 0; i < list.size(); i++) if (list.get(i).value().equals(selected[pane])) index = i;
++        Choice next = list.get(Math.floorMod(index + direction, list.size()));
++        selected[pane] = next.value(); labels[pane] = next.label(); scroll[pane].set(0);
++        // Never show a previous subject's results beneath the newly selected subject's heading.
++        if (pane == 0) first = List.of("Selection changed. Press Analyze."); else second = List.of("Selection changed. Press Analyze.");
++        pending = null; if (analyze != null) analyze.active = true;
++    }
++    private void page(boolean fields, int direction) {
++        int f = data.fieldOffset(), c = data.cellOffset();
++        if (fields) f = direction < 0 ? Math.max(0, f - 1) : f + data.fields().size();
++        else c = direction < 0 ? Math.max(0, c - 1) : c + data.cells().size();
++        PacketDistributor.sendToServer(new FieldGuidePageRequest(f, c));
++    }
++    public void acceptData(FieldGuideDataPayload value) { data = value; status = "Record page refreshed. Existing comparison selections are retained."; }
++    private void query() {
++        if (pending != null) return;
++        pending = UUID.randomUUID(); waitTicks = 0; analyze.active = false;
++        status = "Requesting authoritative saved measurements...";
++        PacketDistributor.sendToServer(new LaboratoryQueryPayload(pending, position, selected[0], selected[1]));
++    }
++    public void acceptResult(LaboratoryResultPayload value) {
++        if (!value.requestId().equals(pending)) return;
++        pending = null; analyze.active = true;
++        first = value.first(); second = value.second(); scroll[0].set(0); scroll[1].set(0);
++        status = "Saved measurements, not a live remote soil scan. Scroll each report independently.";
++    }
++    @Override public void tick() {
++        if (pending != null && ++waitTicks > 200) { pending = null; analyze.active = true; status = "No response. Stay within eight blocks of the Laboratory and try again."; }
++    }
++    @Override public void render(GuiGraphics g, int mx, int my, float partial) {
++        renderBackground(g, mx, my, partial);
++        g.drawCenteredString(font, title, width / 2, 9, 0xFFFFFF);
++        for (int pane = 0; pane < 2; pane++) {
++            int x = left(pane), viewHeight = bottom - top;
++            g.drawString(font, font.plainSubstrByWidth(labels[pane], columnWidth), x, 71, 0xFFFFFF, false);
++            List<FormattedCharSequence> wrapped = new ArrayList<>();
++            for (String line : pane == 0 ? first : second) {
++                wrapped.addAll(font.split(Component.literal(line), Math.max(20, columnWidth - 17)));
++                wrapped.add(FormattedCharSequence.EMPTY);
++            }
++            DetailScroll s = scroll[pane]; s.layout(labels[pane], wrapped.size() * 11, viewHeight);
++            g.fill(x - 2, top - 2, x + columnWidth + 2, bottom + 2, 0xD0181B20);
++            g.enableScissor(x, top, x + columnWidth - 9, bottom);
++            int y = top - s.offset();
++            for (var line : wrapped) { if (y + 10 >= top && y < bottom) g.drawString(font, line, x + 2, y, 0xE6E6E6, false); y += 11; }
++            g.disableScissor();
++            if (s.maximum() > 0) {
++                g.fill(x + columnWidth - 6, top, x + columnWidth - 2, bottom, 0xFF434343);
++                g.fill(x + columnWidth - 6, top + s.thumbOffset(), x + columnWidth - 2, top + s.thumbOffset() + s.thumbHeight(), 0xFFBBBBBB);
++            }
++        }
++        super.render(g, mx, my, partial);
++        if (my >= height - 53 && my < height - 35) g.renderTooltip(font, Component.literal(status), mx, my);
++    }
++    private int hitPane(double x, double y) {
++        if (y < top || y >= bottom) return -1;
++        for (int p = 0; p < 2; p++) if (x >= left(p) && x <= left(p) + columnWidth) return p;
++        return -1;
++    }
++    @Override public boolean mouseScrolled(double x, double y, double horizontal, double vertical) {
++        int p = hitPane(x, y); if (p >= 0) { activePane = p; scroll[p].scroll(-vertical * 22); return true; }
++        return super.mouseScrolled(x, y, horizontal, vertical);
++    }
++    @Override public boolean mouseClicked(double x, double y, int button) {
++        int p = hitPane(x, y);
++        if (p >= 0) {
++            activePane = p;
++            if (button == 0 && x >= left(p) + columnWidth - 9 && scroll[p].maximum() > 0) {
++                dragging = p;
++                double relative = y - top;
++                dragGrab = relative >= scroll[p].thumbOffset() && relative < scroll[p].thumbOffset() + scroll[p].thumbHeight()
++                    ? relative - scroll[p].thumbOffset() : scroll[p].thumbHeight() / 2.0;
++                scroll[p].drag(relative - dragGrab); return true;
++            }
++        }
++        return super.mouseClicked(x, y, button);
++    }
++    @Override public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
++        if (button == 0 && dragging >= 0) { scroll[dragging].drag(y - top - dragGrab); return true; }
++        return super.mouseDragged(x, y, button, dx, dy);
++    }
++    @Override public boolean mouseReleased(double x, double y, int button) { dragging = -1; return super.mouseReleased(x, y, button); }
++    @Override public boolean keyPressed(int key, int scan, int modifiers) {
++        if (!(getFocused() instanceof EditBox)) {
++            if (key == 266 || key == 267) { scroll[activePane].scroll((key == 266 ? -1 : 1) * (bottom - top)); return true; }
++            if (key == 268 || key == 269) { scroll[activePane].set(key == 268 ? 0 : scroll[activePane].maximum()); return true; }
++        }
++        return super.keyPressed(key, scan, modifiers);
++    }
++    @Override public boolean isPauseScreen() { return false; }
++}
+diff --git a/src/main/java/com/foundations/soil/client/LedgerEditorScreen.java b/src/main/java/com/foundations/soil/client/LedgerEditorScreen.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..773bd45180aa4964acc84c21e2cc138ffa44a34f
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/client/LedgerEditorScreen.java
+@@ -0,0 +1,129 @@
++package com.foundations.soil.client;
++
++import com.foundations.soil.ledger.FieldLedgerEntry;
++import com.foundations.soil.ledger.LedgerMutation;
++import com.foundations.soil.network.FieldGuideDataPayload;
++import com.foundations.soil.network.FieldGuideDataPayload.CellView;
++import com.foundations.soil.network.FieldGuideDataPayload.FieldView;
++import com.foundations.soil.network.LedgerEditPayload;
++import com.foundations.soil.network.LedgerEditReply;
++import java.util.UUID;
++import net.minecraft.client.gui.GuiGraphics;
++import net.minecraft.client.gui.components.Button;
++import net.minecraft.client.gui.components.EditBox;
++import net.minecraft.client.gui.screens.ConfirmScreen;
++import net.minecraft.client.gui.screens.Screen;
++import net.minecraft.network.chat.Component;
++import net.neoforged.neoforge.network.PacketDistributor;
++
++/** Edits are requests. The displayed ledger changes only after the server returns an accepted snapshot. */
++public final class LedgerEditorScreen extends Screen {
++    private final FieldGuideScreen parent;
++    private final FieldView field;
++    private final CellView cell;
++    private final boolean creating;
++    private EditBox name, note, assignment;
++    private Button favoriteButton, saveButton, deleteButton, chooseButton;
++    private boolean favorite;
++    private UUID pending;
++    private int waitingTicks, left, top, panelWidth;
++    private String status = "";
++
++    public LedgerEditorScreen(FieldGuideScreen parent, FieldView field, CellView cell, boolean creating) {
++        super(Component.literal(creating ? "Create field" : cell != null ? "Edit discovered cell" : "Edit field"));
++        this.parent = parent; this.field = field; this.cell = cell; this.creating = creating;
++        favorite = !creating && (field != null ? field.favorite() : cell != null && cell.favorite());
++    }
++    @Override protected void init() {
++        panelWidth = Math.max(240, Math.min(370, width - 20));
++        left = (width - panelWidth) / 2; top = Math.max(4, (height - 244) / 2);
++        String oldName = name == null ? field == null ? "" : field.name() : name.getValue();
++        String oldNote = note == null ? creating ? "" : field != null ? field.note() : cell == null ? "" : cell.note() : note.getValue();
++        String oldAssignment = assignment == null ? String.valueOf(cell == null ? 0 : cell.fieldId()) : assignment.getValue();
++        name = new EditBox(font, left + 12, top + 39, panelWidth - 24, 18, Component.literal("Field name"));
++        name.setMaxLength(64); name.setValue(oldName); name.setVisible(creating || cell == null); addRenderableWidget(name);
++        note = new EditBox(font, left + 12, top + 80, panelWidth - 24, 18, Component.literal("Note"));
++        note.setMaxLength(256); note.setValue(oldNote); addRenderableWidget(note);
++        favoriteButton = addRenderableWidget(Button.builder(favoriteLabel(), button -> {
++            favorite = !favorite; button.setMessage(favoriteLabel());
++        }).bounds(left + 12, top + 106, panelWidth - 24, 18).build());
++        assignment = new EditBox(font, left + 12, top + 149, 76, 18, Component.literal("Field ID; zero unassigns"));
++        assignment.setMaxLength(10); assignment.setFilter(value -> value.matches("[0-9]*")); assignment.setValue(oldAssignment);
++        assignment.setVisible(!creating && cell != null); addRenderableWidget(assignment);
++        chooseButton = addRenderableWidget(Button.builder(Component.literal("Choose next field"), button -> chooseField())
++            .bounds(left + 96, top + 149, panelWidth - 108, 18).build());
++        chooseButton.visible = assignment.isVisible();
++        int half = (panelWidth - 28) / 2;
++        saveButton = addRenderableWidget(Button.builder(Component.literal(creating ? "Create" : "Save"), button -> send(
++            creating ? LedgerMutation.Action.CREATE_FIELD : cell != null ? LedgerMutation.Action.SAVE_CELL : LedgerMutation.Action.SAVE_FIELD))
++            .bounds(left + 12, top + 183, half, 20).build());
++        addRenderableWidget(Button.builder(Component.literal("Back"), button -> onClose()).bounds(left + 16 + half, top + 183, half, 20).build());
++        deleteButton = addRenderableWidget(Button.builder(Component.literal("Delete field..."), button -> {
++            if (minecraft != null) minecraft.setScreen(new ConfirmScreen(confirmed -> {
++                minecraft.setScreen(this);
++                if (confirmed) send(LedgerMutation.Action.DELETE_FIELD);
++            }, Component.literal("Delete this field?"), Component.literal("Discovered cells and their notes will be retained, but unassigned.")));
++        }).bounds(left + 12, top + 209, panelWidth - 24, 18).build());
++        deleteButton.visible = !creating && field != null;
++        setInitialFocus(name.isVisible() ? name : note);
++        lock(pending != null);
++    }
++    private Component favoriteLabel() { return Component.literal("Favorite: " + (favorite ? "Yes" : "No")); }
++    private void chooseField() {
++        var choices = parent.data().fields();
++        int current = fieldId(), index = -1;
++        for (int i = 0; i < choices.size(); i++) if (choices.get(i).id() == current) index = i;
++        assignment.setValue(String.valueOf(index + 1 < choices.size() ? choices.get(index + 1).id() : 0));
++    }
++    private int fieldId() {
++        try { return assignment == null || assignment.getValue().isBlank() ? 0 : Integer.parseInt(assignment.getValue()); }
++        catch (NumberFormatException ignored) { return -1; }
++    }
++    private void send(LedgerMutation.Action action) {
++        if (pending != null) return;
++        int id = cell != null && !creating ? fieldId() : field == null ? 0 : field.id();
++        if (id < 0) { status = "Enter a valid field ID."; return; }
++        if (action != LedgerMutation.Action.SAVE_CELL && action != LedgerMutation.Action.DELETE_FIELD && name.getValue().isBlank()) {
++            status = "Enter a field name."; return;
++        }
++        String key = cell == null ? "" : FieldLedgerEntry.key(cell.dimension(), cell.cellX(), cell.cellZ());
++        pending = UUID.randomUUID(); waitingTicks = 0; status = "Waiting for server confirmation..."; lock(true);
++        PacketDistributor.sendToServer(new LedgerEditPayload(pending,
++            new LedgerMutation(action, key, id, name.getValue(), note.getValue(), favorite),
++            parent.data().fieldOffset(), parent.data().cellOffset()));
++    }
++    private void lock(boolean locked) {
++        name.setEditable(!locked); note.setEditable(!locked); assignment.setEditable(!locked);
++        saveButton.active = deleteButton.active = favoriteButton.active = chooseButton.active = !locked;
++    }
++    public void acceptData(FieldGuideDataPayload data) { parent.acceptData(data); }
++    public void acceptReply(LedgerEditReply reply) {
++        if (pending == null || !pending.equals(reply.requestId())) return;
++        pending = null; status = reply.message(); lock(false);
++        if (reply.snapshot() != null) { parent.acceptData(reply.snapshot()); onClose(); }
++    }
++    @Override public void tick() {
++        super.tick();
++        if (pending != null && ++waitingTicks >= 200) {
++            pending = null; lock(false);
++            status = "No reply received. Reopen the guide to verify before retrying.";
++        }
++    }
++    @Override protected void renderBlurredBackground(float partialTick) {}
++    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
++        g.fill(0, 0, width, height, 0xAA17130F);
++        g.fill(left, top, left + panelWidth, top + 240, 0xFFF4E8BF);
++        g.drawString(font, title, left + 12, top + 10, 0xFF3B2B1D, false);
++        String label = creating || cell == null ? "Field name" : "Cell " + cell.cellX() + ", " + cell.cellZ();
++        g.drawString(font, label, left + 12, top + 27, 0xFF3B2B1D, false);
++        g.drawString(font, "Note (up to 256 characters)", left + 12, top + 67, 0xFF3B2B1D, false);
++        if (!creating && cell != null) {
++            String assigned = parent.data().fields().stream().filter(f -> f.id() == fieldId()).map(FieldView::name).findFirst().orElse("0 = unassigned; other pages accept an ID");
++            g.drawString(font, font.plainSubstrByWidth("Field: " + assigned, panelWidth - 24), left + 12, top + 135, 0xFF3B2B1D, false);
++        }
++        if (!status.isBlank()) g.drawString(font, font.plainSubstrByWidth(status, panelWidth - 24), left + 12, top + 171, 0xFF9B472B, false);
++        super.render(g, mouseX, mouseY, partialTick);
++    }
++    @Override public boolean isPauseScreen() { return false; }
++    @Override public void onClose() { if (minecraft != null) minecraft.setScreen(parent); }
++}
+diff --git a/src/main/java/com/foundations/soil/client/SoilHudClientEvents.java b/src/main/java/com/foundations/soil/client/SoilHudClientEvents.java
+index 23c5b22a52a9c420c15bd83ea33408e024538858..6640d1359d0e065d27fff73c3882eecc13503694 100644
+--- a/src/main/java/com/foundations/soil/client/SoilHudClientEvents.java
++++ b/src/main/java/com/foundations/soil/client/SoilHudClientEvents.java
+@@ -27,0 +28 @@ public final class SoilHudClientEvents {
++        boolean refresh = ClientFieldGuideState.isRefresh();
+@@ -30 +31,6 @@ public final class SoilHudClientEvents {
+-            mc.setScreen(new FieldGuideScreen(guidePayload));
++            if (mc.player != null && mc.level != null) {
++                if (mc.screen instanceof FieldGuideScreen guide) guide.acceptData(guidePayload);
++                else if (mc.screen instanceof LedgerEditorScreen editor) editor.acceptData(guidePayload);
++                else if (mc.screen instanceof LaboratoryScreen lab) lab.acceptData(guidePayload);
++                else if (!refresh) mc.setScreen(new FieldGuideScreen(guidePayload));
++            }
+@@ -31,0 +38,6 @@ public final class SoilHudClientEvents {
++        var labOpen = ClientLaboratoryState.takeOpen();
++        if (labOpen != null && mc.player != null && mc.level != null) mc.setScreen(new LaboratoryScreen(labOpen));
++        var labResult = ClientLaboratoryState.takeResult();
++        if (labResult != null && mc.screen instanceof LaboratoryScreen lab) lab.acceptResult(labResult);
++        var editReply = ClientLedgerEditState.take();
++        if (editReply != null && mc.screen instanceof LedgerEditorScreen editor) editor.acceptReply(editReply);
+@@ -78,0 +91,2 @@ public final class SoilHudClientEvents {
++        ClientLedgerEditState.clear();
++        ClientLaboratoryState.clear();
