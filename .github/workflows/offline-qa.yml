@@ -1,0 +1,42 @@
+name: Offline QA toolchain
+on:
+  push:
+    paths: ['.github/workflows/offline-qa.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Export resolved compiler and test classpath
+        shell: bash
+        run: |
+          chmod +x gradlew
+          cat > /tmp/soil-offline.gradle <<'GRADLE'
+          allprojects {
+              afterEvaluate {
+                  tasks.register('stageOfflineQa', Zip) {
+                      dependsOn tasks.named('testClasses')
+                      from(sourceSets.test.runtimeClasspath)
+                      duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+                      archiveFileName = 'soil-offline-qa.zip'
+                      destinationDirectory = layout.buildDirectory.dir('offline')
+                  }
+              }
+          }
+          GRADLE
+          ./gradlew --no-daemon -I /tmp/soil-offline.gradle stageOfflineQa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: soil-offline-qa
+          path: build/offline/soil-offline-qa.zip
+          retention-days: 3
+          if-no-files-found: error
