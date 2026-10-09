@@ -1,0 +1,254 @@
+diff --git a/docs/beta/INTEGRATION_CONTRACT.md b/docs/beta/INTEGRATION_CONTRACT.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..5e33b675e8bca1c345ad71b36b692738831ba0a2
+--- /dev/null
++++ b/docs/beta/INTEGRATION_CONTRACT.md
+@@ -0,0 +1,21 @@
++# API contract 3 — physical soil and trait response
++
++`FoundationsSoilApi.API_VERSION` is `0.1.0`, and `CONTRACT_VERSION` is `3`. Existing SoilSnapshot constructors and the existing service/script gateway remain available. New entry points require the Minecraft server thread and do not create soil cells or load remote chunks:
++
++- `physicalSnapshot(ServerLevel, BlockPos)` returns an Optional immutable snapshot containing the legacy values, an Optional texture, geology-source label, and an immutable list of up to 16 observed trend points. Empty physical texture means a legacy record has not yet been initialized against its soil block; it is not a claimed field measurement.
++- `evaluateTraits(ServerLevel, BlockPos, String cropId, SoilTraits, double tfcHydration)` accepts TFC hydration normalized to 0–1 and returns an Optional SoilResponse. Traits are abstract pH shift, compaction tolerance, salinity tolerance and waterlogging tolerance; neutral inputs are `SoilTraits.NEUTRAL`. Soil never stores genomes or replaces TFC nutrients/water.
++- The legacy `cropSoilResponse` helper retains its earlier chemistry response semantics. Do not confuse it with the new physical/trait evaluation or stack both automatically.
++
++The TFC bridge adjusts only positive newly accumulated yield, with the configured blend strength. It does not rerun crop growth, edit previous yield on inspection, alter reset-to-zero harvest operations, or write stored N/P/K. Supported TFC fruit picking records a cycle without decrementing active plants or adding whole-plant residues.
++
++The existing `KUBEJS_EXAMPLE.js` is Java interop, not an automatically registered KubeJS plugin/global. The additional example below must be called from an actual server-side event with a ServerLevel and soil BlockPos; do not copy an invented event name. Registration overrides should be installed during server-script initialization and verified after `/reload` in the target pack. Native KubeJS and Genetics adapters have not yet passed their manual beta smoke tests.
++
++```js
++const SoilApi = Java.loadClass('com.foundations.soil.api.FoundationsSoilApi')
++const SoilTraits = Java.loadClass('com.foundations.soil.api.SoilTraits')
++// `level`, `soilPos`, `cropId`, and `hydration01` come from your server-side adapter.
++// const snapshot = SoilApi.physicalSnapshot(level, soilPos)
++// const response = SoilApi.evaluateTraits(level, soilPos, cropId, SoilTraits.NEUTRAL, hydration01)
++```
++
++Call lifecycle hooks only when an operation actually succeeded. Coordinate-based duplicate suppression covers the existing 4x4 occupancy model; this is not a generic asynchronous transaction API. External machines retain responsibility for consuming their items/fluids and for transport. Soil validates and applies the resulting amendment dose on the server thread.
+diff --git a/docs/beta/README.md b/docs/beta/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..a510dc4bb0e44a9744a790f4eb0444d162a79f75
+--- /dev/null
++++ b/docs/beta/README.md
+@@ -0,0 +1,8 @@
++# 0.1.0-beta delivery
++
++- [Release notes and migration warning](RELEASE_NOTES.md)
++- [Executed evidence and open acceptance matrix](VALIDATION.md)
++- [API contract 3](INTEGRATION_CONTRACT.md)
++- [Initial model/storage measurements](initial-model-benchmark.json)
++
++The main/source implementation is intentionally separated from manual in-game acceptance. No 26.x Soil build is claimed by this 1.21.1 beta.
+diff --git a/docs/beta/RELEASE_NOTES.md b/docs/beta/RELEASE_NOTES.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..758e2dffeb77df0b4c13f91e44232ca1a9345f19
+--- /dev/null
++++ b/docs/beta/RELEASE_NOTES.md
+@@ -0,0 +1,31 @@
++# Foundations Soil 0.1.0-beta — Minecraft 1.21.1
++
++This prerelease rolls the implementation work from the planned R7/R8, 0.0.4a, 0.0.5a, 0.0.6a and 0.0.7a packages into one beta. Those intermediate versions were not separately released. This is not 1.0 and is not a claim that the manual beta acceptance matrix has passed.
++
++## Included
++
++- **Field Guide completion:** independent wrapped detail scrolling on all tabs, draggable scroll thumb, keyboard navigation, bounded server paging, and explicit page-subset labels for field summaries.
++- **Field management:** create/rename/delete fields, assign discovered cells, notes and favorites. Changes are acknowledged by the server; deletion requires confirmation. Another player's ledger cannot be selected by a client packet.
++- **Physical soil:** persistent normalized sand/silt/clay composition, climate-informed initial profiles, derived water-holding/aeration/drainage/root resistance, and waterlogging response. Old seven-stat soil profiles are preserved; amendments do not rewrite mineral texture.
++- **Soil Laboratory:** a craftable, non-ticking analysis block with two comparison panes, own-field/own-cell selection, complete-field snapshot averages, warnings, and bounded observed trends. Distant chunks are not loaded for reports. Stored TFC nutrient readings are explicitly not live measurements.
++- **Crop and integration work:** corrected maturity checks and duplicate planting/removal suppression; fruit-picking history that leaves plants and residues in place; API contract 3 physical snapshots and abstract trait responses. A chainable TFC yield hook scales newly earned yield only. Stored N/P/K, hydration, growth and expiry remain TFC-owned.
++- **Hardening:** protocol 8 bounded packets, request cooldowns and edit replay checks, strict malformed/future-data handling, safe existing-save guards against Minecraft's empty-data fallback, and a scheduler that completes its queued day rather than starving cells when time advances quickly.
++- **Build and verification:** corrected Java/Parchment properties, reproducible JAR ordering, sources JAR, model-test configuration fixture, optional full-runtime test mode, and a repeatable storage/model benchmark.
++
++## Installation and compatibility
++
++Use matching client/server **0.1.0-beta** JARs. Minecraft 1.21.1, Java 21, NeoForge 21.1.250, TerraFirmaCraft and its Patchouli dependency, and a genuine compatible Foundations Framework are required. The build is pinned to TFC file 8831715 (4.2.10) and Patchouli 1.21.1-92-NEOFORGE. Metadata retains TFC 4.2.8+ and Framework 0.0.5a+ minimums; other dependency versions need separate runtime validation.
++
++**Back up the entire world before upgrading.** Soil Cell schema/model advance from 3/3 to 4/4; Field Ledger schema advances from 4 to 5; network protocol advances from 7 to 8. Downgrading the same world is not supported: restore the backup instead. On unreadable saved data, the guard refuses an empty replacement. Stop the server and repair or restore the original file; do not delete it to silence an error.
++
++Texture fractions and response formulas are gameplay approximations, not measured soil science. The server setting `crop_response.tfc_yield_response_strength` defaults to `0.5`; set it to `0.0` to disable Soil's yield-delta adjustment while retaining soil records and analysis.
++
++## Validation and remaining gates
++
++The local Java 21 compiler and **70 automated tests** pass against the actual pinned dependency classpath. Tests cover legacy/stat preservation, bounded trends, delayed amendment persistence, ownership/input validation, packet round trips, exact TFC hook targets, resource presence, and the real Minecraft saved-data fallback guard. The build/release workflow reruns native Gradle compilation and tests before publication.
++
++The 1,000 / 10,000 / 50,000-cell model/storage benchmark completed with exact NBT round-trip comparisons. The initial 50,000-cell fixture measured 67.236 ms for one whole model day and 0.643 ms p95 per 250-cell batch. These are **not server TPS results** and exclude real TFC chunk sampling, GUI rendering, networking and modpack load. See VALIDATION.md and the recorded JSON.
++
++**Still required:** client and dedicated-server launch with genuine Framework; in-game mixin transformation and crop/yield trials; GUI scale/controller-of-screen checks; long seasonal balance; real old-world upgrades and restart-under-load; native KubeJS/Genetics/JEI/Jade pack interoperability. The available Framework Library record could not be materialized for the test runtime. Its dependency was not removed or replaced with a stub.
++
++**Platform scope:** this artifact is 1.21.1 only. The 26.3 Soil port and future 26.4 transition remain separate work and are not represented as working builds by this release. Erosion, groundwater, deep horizons, and irrigation transport remain later expansions.
+diff --git a/docs/beta/VALIDATION.md b/docs/beta/VALIDATION.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..eb33c854da06fcbd7fa09a7e0ca75f9707eb8b2d
+--- /dev/null
++++ b/docs/beta/VALIDATION.md
+@@ -0,0 +1,44 @@
++# Beta validation record
++
++## Executed locally (2026-10-09 UTC / 2026-10-08 Pacific)
++
++- Java 21 compilation of all main and test sources against the actual GitHub-resolved Minecraft / NeoForge / TFC / Patchouli dependency JARs: **PASS**.
++- Standalone JUnit model suite: **70 found, 70 passed, zero skipped, zero failed**.
++- Exact pinned TFC bytecode hook counts: one growth yield write; two fruit-picking yield-reset paths in each supported pickable crop class: **PASS**. This checks targets, not successful Mixin transformation inside the game.
++- Worst-case multi-byte Field Guide and Laboratory packet round trips stay under their tested limits: **PASS**. The guide pages cap fields at 128 and cells at 64; event rows cap at eight.
++- SafeSavedData tested using real Minecraft DimensionDataStorage: valid existing data loads, genuinely absent data creates, and an unreadable existing file cannot be replaced with an empty instance, including repeated requests: **PASS**.
++- Laboratory recipe/model/loot resource presence and pinned TFC brass/glass resource paths: **PASS**. A native recipe-reload/JEI screen test is still required.
++- 1k/10k/50k storage and simulation microbenchmarks: **PASS**, with identical saved cell tags after compressed round trips.
++
++`initial-model-benchmark.json` records a single-run, warmed model benchmark with simple unmonitored cells. Do not extrapolate its compression ratio or heap delta to a large, heavily monitored world. Save/load includes NBT and compression; heap delta is approximate allocation, not measured retained heap. The full-server scheduler still snapshots all tracked keys once per pass. Real server profiling must decide whether storage should be split or indexed further.
++
++## Reproduction
++
++```
++./gradlew --no-daemon clean test build soilScaleBenchmark
++```
++
++JUnit reports: `build/reports/tests/test/`. Model benchmark: `build/reports/soil-scale-benchmark.json`. Runtime tests are a separate mode:
++
++```
++./gradlew --no-daemon -PmodRuntimeTests=true clean test
++```
++
++Place the genuine compatible Framework dependency at the configured `libs/<framework_jar>` path first. Full-runtime mode deliberately fails with an actionable error if that dependency is missing. Model-test passes must never be described as a full mod-loading pass.
++
++## Manual beta matrix — not yet executed
++
++| Area | Required checks | Status |
++| --- | --- | --- |
++| Launch | New integrated world and dedicated TFC/Framework server; `/fsoil selftest` | Pending |
++| UI | GUI scales 1–4 and Auto, small windows, long names/notes/events, paging/search, editor rejection/timeouts | Pending |
++| Multiplayer | Two owners, simultaneous edits, rejected spoof/replay, reconnect, matching protocol | Pending |
++| Upgrade | Copies of 1a/2a/3a worlds; physical defaults without changing stored seven stats, notes or amendment queues | Pending |
++| Crops | Grain/root/legume/flooded/double/climbing/spreading/pickable; early removal, maturity, expiry, automation, reload and regrowth | Pending |
++| Yield | Controlled identical TFC trials; strength 0/0.5/1; stored N/P/K unchanged by Soil; mixin compatibility with other crop mods | Pending |
++| Calendar | Seasons, accelerated days, backwards time, multi-year fallow, restart during delayed release | Pending |
++| Scale | Chunk sampling, many owners/fields, dense 16-point trends, production save pauses, retained heap, real packet traffic | Pending |
++| Optional integrations | Real KubeJS reload/startup, Genetics/Cannabis adapter, JEI/Jade and fluid-delivery pack tests | Pending |
++| Newer platforms | Native 26.3 compilation/launch, compatible TFC/Framework dependencies, 26.4 transition | Pending |
++
++Record the exact modpack, configuration, world copy and log evidence when closing a row. A successful GitHub build only closes compilation/automated-test gates.
+diff --git a/docs/beta/initial-model-benchmark.json b/docs/beta/initial-model-benchmark.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..fc8fd68eecf6f39aae8ae4a7166f7200b737fd72
+--- /dev/null
++++ b/docs/beta/initial-model-benchmark.json
+@@ -0,0 +1,10 @@
++{
++  "kind":"model-storage-microbenchmark-not-server-TPS",
++  "java":"21.0.12.1",
++  "results":[
++    {"cells":1000,"initialize_ms":35.221,"key_snapshot_ms":3.962,"simulate_day_ms":1.260,"batch_250_p95_ms":0.596,"save_nbt_ms":6.654,"compress_ms":57.149,"load_compressed_ms":92.918,"compressed_bytes":7856,"allocated_heap_delta_bytes":1572864},
++    {"cells":10000,"initialize_ms":7.711,"key_snapshot_ms":1.511,"simulate_day_ms":6.155,"batch_250_p95_ms":0.329,"save_nbt_ms":199.271,"compress_ms":174.458,"load_compressed_ms":455.875,"compressed_bytes":71062,"allocated_heap_delta_bytes":6815744},
++    {"cells":50000,"initialize_ms":54.999,"key_snapshot_ms":9.086,"simulate_day_ms":67.236,"batch_250_p95_ms":0.643,"save_nbt_ms":328.379,"compress_ms":749.043,"load_compressed_ms":1176.172,"compressed_bytes":351655,"allocated_heap_delta_bytes":28934056}
++  ],
++  "limitations":"No live TFC chunks, networking, server tick loop, or dedicated-server pack. Heap delta is approximate allocation, not retained heap."
++}
+diff --git a/src/main/java/com/foundations/soil/FoundationsSoil.java b/src/main/java/com/foundations/soil/FoundationsSoil.java
+index 5296f2078be747e1120729118297f0b07b659d2e..717b076f9e6bf3b486614452aaf78e141b8b1edd 100644
+--- a/src/main/java/com/foundations/soil/FoundationsSoil.java
++++ b/src/main/java/com/foundations/soil/FoundationsSoil.java
+@@ -23 +23 @@ public final class FoundationsSoil {
+-    public static final String VERSION = "0.0.3a.R6";
++    public static final String VERSION = "0.1.0-beta";
+@@ -27,0 +28 @@ public final class FoundationsSoil {
++        com.foundations.soil.registry.SoilBlocks.register(modBus);
+diff --git a/src/main/java/com/foundations/soil/api/DefaultSoilService.java b/src/main/java/com/foundations/soil/api/DefaultSoilService.java
+index 8735d2bc97982e5a0f7dd9c4286ead509b2fca9b..8bab76176b8ed432ba8f8e1bfaeec57e6d1af4d7 100644
+--- a/src/main/java/com/foundations/soil/api/DefaultSoilService.java
++++ b/src/main/java/com/foundations/soil/api/DefaultSoilService.java
+@@ -145,0 +146 @@ final class DefaultSoilService implements SoilService {
++        if (!level.getServer().isSameThread()) throw new IllegalStateException("Foundations Soil world reads require the authoritative server thread");
+diff --git a/src/main/java/com/foundations/soil/api/FoundationsSoilApi.java b/src/main/java/com/foundations/soil/api/FoundationsSoilApi.java
+index 71cad55f51e846ccb304c0e6660e33e5c069bca4..3f6abb120365b3e6a42615f8946aeb322fc2139b 100644
+--- a/src/main/java/com/foundations/soil/api/FoundationsSoilApi.java
++++ b/src/main/java/com/foundations/soil/api/FoundationsSoilApi.java
+@@ -20,3 +20,3 @@ public final class FoundationsSoilApi {
+-    public static final String API_VERSION = "0.0.2";
+-    /** Contract v2 adds normalized solid/liquid amendment dosing while preserving v1 helpers. */
+-    public static final int CONTRACT_VERSION = 2;
++    public static final String API_VERSION = "0.1.0";
++    /** Contract v3 adds immutable physical observations and genotype-independent tolerance inputs. */
++    public static final int CONTRACT_VERSION = 3;
+@@ -40,0 +41,22 @@ public final class FoundationsSoilApi {
++    /** Server-thread-only, read-only: no cell creation, simulation, or chunk loading. */
++    public static Optional<SoilPhysicalSnapshot> physicalSnapshot(ServerLevel level, BlockPos soilPos) {
++        requireServerRead(level, soilPos);
++        return com.foundations.soil.soil.SoilManager.peek(level, soilPos).map(cell -> new SoilPhysicalSnapshot(
++            SoilSnapshots.from(cell), cell.physicalInitialized() ? Optional.of(cell.texture()) : Optional.empty(),
++            cell.geologySource(), cell.trend().points()));
++    }
++
++    /** Callers supply TFC hydration normalized to [0,1], not a second stored water resource. */
++    public static Optional<SoilResponse> evaluateTraits(ServerLevel level, BlockPos soilPos, String cropId,
++                                                       SoilTraits traits, double tfcHydration) {
++        requireServerRead(level, soilPos);
++        ResourceLocation id = ResourceLocation.tryParse(cropId);
++        if (id == null) throw new IllegalArgumentException("Invalid crop id");
++        return com.foundations.soil.soil.SoilManager.peek(level, soilPos).map(cell -> SoilResponse.evaluate(cell.profile(),
++            cell.texture(), com.foundations.soil.crop.CropRegistry.resolve(id), traits, tfcHydration, cell.continuousPressure()));
++    }
++    private static void requireServerRead(ServerLevel level, BlockPos pos) {
++        if (level == null || pos == null || !level.getServer().isSameThread())
++            throw new IllegalStateException("Soil world reads must run on the Minecraft server thread");
++    }
++
+diff --git a/src/main/java/com/foundations/soil/api/SoilPhysicalSnapshot.java b/src/main/java/com/foundations/soil/api/SoilPhysicalSnapshot.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6b268a53c656e0acbc8c0dab884b7cec2576ce45
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/api/SoilPhysicalSnapshot.java
+@@ -0,0 +1,15 @@
++package com.foundations.soil.api;
++
++import com.foundations.soil.soil.SoilTexture;
++import com.foundations.soil.soil.SoilTrend;
++import java.util.List;
++import java.util.Optional;
++
++/** A read cannot invent missing legacy composition or create historical observations. */
++public record SoilPhysicalSnapshot(SoilSnapshot soil, Optional<SoilTexture> texture,
++                                   String geologySource, List<SoilTrend.Point> observations) {
++    public SoilPhysicalSnapshot {
++        if (soil == null || texture == null || geologySource == null) throw new IllegalArgumentException("Invalid physical snapshot");
++        observations = List.copyOf(observations);
++    }
++}
+diff --git a/src/main/java/com/foundations/soil/api/SoilResponse.java b/src/main/java/com/foundations/soil/api/SoilResponse.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..4f03f59897de7d4df5012b949ee2fddd88e7124b
+--- /dev/null
++++ b/src/main/java/com/foundations/soil/api/SoilResponse.java
+@@ -0,0 +1,34 @@
++package com.foundations.soil.api;
++
++import com.foundations.soil.crop.CropDefinition;
++import com.foundations.soil.soil.SoilPhysics;
++import com.foundations.soil.soil.SoilProfile;
++import com.foundations.soil.soil.SoilTexture;
++
++/** Pure response calculation shared by the TFC yield bridge and external phenotype consumers. */
++public record SoilResponse(double cropCompatibility, double nutrientAccess, double physicalResponse,
++                           double rotationResponse, double combined) {
++    public static SoilResponse evaluate(SoilProfile profile, SoilTexture texture, CropDefinition crop,
++                                        SoilTraits traits, double hydration, double pressure) {
++        if (profile == null || texture == null || crop == null || traits == null || !Double.isFinite(pressure))
++            throw new IllegalArgumentException("Invalid soil response inputs");
++        var tolerated = new CropDefinition(crop.family(), crop.preferredPHMin() + traits.pHShift(), crop.preferredPHMax() + traits.pHShift(),
++            crop.compactionTolerance() + traits.compactionToleranceBonus(), crop.drainageMinimum(), crop.drainagePreferred(), crop.organicMatterResponse());
++        double compatibility = tolerated.soilResponse(profile);
++        double access = Math.min(1.08, profile.nutrientAvailabilityModifier() * traits.nutrientEfficiency());
++        var physics = SoilPhysics.evaluate(texture, profile, hydration);
++        double physical = physics.responseModifier() * (1 - profile.salinity() * .20 * (1 - traits.salinityTolerance()));
++        if (physics.moisture() == SoilPhysics.Moisture.WATERLOGGED) physical += (1 - physical) * traits.waterloggingTolerance();
++        double rotation = 1 - Math.max(0, Math.min(1, pressure)) * .15;
++        return new SoilResponse(compatibility, access, physical, rotation,
++            Math.max(.20, Math.min(1.08, compatibility * access * physical * rotation)));
++    }
++    /** Scale only newly-earned yield; never re-scale previously accumulated crop yield. */
++    public static float applyYield(float previous, float proposed, double response, double strength) {
++        if (!Float.isFinite(previous) || !Float.isFinite(proposed) || !Double.isFinite(response) || !Double.isFinite(strength))
++            throw new IllegalArgumentException("Yield response inputs must be finite");
++        if (proposed <= previous) return proposed;
++        double scale = 1 + (Math.max(.20, Math.min(1.08, response)) - 1) * Math.max(0, Math.min(1, strength));
++        return (float) Math.min(1.0, previous + (proposed - previous) * scale);
++    }
++}
