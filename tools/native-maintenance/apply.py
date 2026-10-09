@@ -1,4 +1,4 @@
-"""Verify the reviewed native checkpoint without touching the retained main branch."""
+"""Verify ordered native corrections without touching the retained main branch."""
 from pathlib import Path
 import hashlib
 import json
@@ -28,42 +28,55 @@ def main():
     for name in delta:
         if not name.startswith('tools/native-maintenance/') and name != '.github/workflows/native-maintenance.yml':
             raise RuntimeError('Concurrent source changes require review: ' + name)
-    patches, expected = [], {}
-    for name, checksum in sorted(ready['parts'].items()):
+    parts = ready['parts']
+    rounds = ready.get('rounds', [sorted(parts)])
+    flat = [name for batch in rounds for name in batch]
+    if not 1 <= len(rounds) <= 8 or any(not batch for batch in rounds) or len(flat) != len(set(flat)) or set(flat) != set(parts):
+        raise RuntimeError('Invalid or duplicate patch round')
+    contents = {}
+    for name, checksum in parts.items():
         if not re.fullmatch(r'[0-9]{2}\.patch', name):
             raise RuntimeError('Invalid patch name')
-        path = STAGE / name
-        content = path.read_bytes()
+        content = (STAGE / name).read_bytes()
         if len(content) > 100000 or hashlib.sha256(content).hexdigest() != checksum:
             raise RuntimeError('Transport checksum mismatch: ' + name)
-        for section in re.split(r'(?=^diff --git )', content.decode(), flags=re.M):
-            if not section:
-                continue
-            entry = re.match(r'diff --git a/(\S+) b/(\S+)\n', section)
-            index = re.search(r'^index ([0-9a-f]{40})\.\.([0-9a-f]{40})(?: 100644)?$', section, re.M)
-            if not entry or not index or entry[1] != entry[2] or not allowed(entry[1]):
-                raise RuntimeError('Unsupported source patch')
-            target = ROOT / entry[1]
-            if entry[1] in expected or target.is_symlink():
-                raise RuntimeError('Duplicate or symlink source')
-            old, new = index.groups()
-            if old == '0' * 40:
-                if target.exists():
-                    raise RuntimeError('New file already exists: ' + entry[1])
-            elif not target.is_file() or blob(target.read_bytes()) != old:
-                raise RuntimeError('Source identity mismatch: ' + entry[1])
-            if new == '0' * 40:
-                raise RuntimeError('Source deletions are not part of this checkpoint')
-            expected[entry[1]] = new
-        patches.append(str(path))
-    if len(expected) != ready['files']:
-        raise RuntimeError('Unexpected source file count')
-    subprocess.run(['git', 'apply', '--check', *patches], cwd=ROOT, check=True)
-    subprocess.run(['git', 'apply', *patches], cwd=ROOT, check=True)
-    for name, checksum in expected.items():
+        contents[name] = content.decode('utf-8')
+    final = {}
+    for batch in rounds:
+        expected = {}
+        for name in batch:
+            for section in re.split(r'(?=^diff --git )', contents[name], flags=re.M):
+                if not section:
+                    continue
+                entry = re.match(r'diff --git a/(\S+) b/(\S+)\n', section)
+                index = re.search(r'^index ([0-9a-f]{40})\.\.([0-9a-f]{40})(?: 100644)?$', section, re.M)
+                if not entry or not index or entry[1] != entry[2] or not allowed(entry[1]):
+                    raise RuntimeError('Unsupported source patch')
+                target = ROOT / entry[1]
+                if entry[1] in expected or target.is_symlink():
+                    raise RuntimeError('Duplicate path within round or symlink source')
+                old, new = index.groups()
+                if old == '0' * 40:
+                    if target.exists():
+                        raise RuntimeError('New file already exists: ' + entry[1])
+                elif not target.is_file() or blob(target.read_bytes()) != old:
+                    raise RuntimeError('Source identity mismatch: ' + entry[1])
+                if new == '0' * 40:
+                    raise RuntimeError('Source deletions are not part of this checkpoint')
+                expected[entry[1]] = new
+        patches = [str(STAGE / name) for name in batch]
+        subprocess.run(['git', 'apply', '--check', *patches], cwd=ROOT, check=True)
+        subprocess.run(['git', 'apply', *patches], cwd=ROOT, check=True)
+        for name, checksum in expected.items():
+            if blob((ROOT / name).read_bytes()) != checksum:
+                raise RuntimeError('Applied source identity mismatch: ' + name)
+        final.update(expected)
+    if len(final) != ready['files']:
+        raise RuntimeError('Unexpected final source file count')
+    for name, checksum in final.items():
         if blob((ROOT / name).read_bytes()) != checksum:
-            raise RuntimeError('Applied source identity mismatch: ' + name)
-    print(f'Verified {len(expected)} native source/doc/test changes. No 1.21.1 writes are performed.')
+            raise RuntimeError('Final source identity mismatch: ' + name)
+    print(f'Verified {len(final)} native source/doc/test changes in {len(rounds)} reviewed rounds. No 1.21.1 writes are performed.')
 
 if __name__ == '__main__':
     main()
