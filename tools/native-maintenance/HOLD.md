@@ -1,1 +1,0 @@
-Publication hold: an additional two-dose nested-transaction sequence exposed a rollback ordering defect in the staged per-dose journal. Do not publish the staged checkpoint until the shared-cell journal fix and regression test pass. This commit intentionally invalidates the in-flight workflow's expected branch head. No 1.21.1 changes.

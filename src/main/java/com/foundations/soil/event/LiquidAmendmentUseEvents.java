@@ -2,7 +2,10 @@ package com.foundations.soil.event;
 
 import com.foundations.soil.FoundationsSoil;
 import com.foundations.soil.amendment.AmendmentRegistry;
-import com.foundations.soil.api.FoundationsSoilApi;
+import com.foundations.soil.amendment.AmendmentApplicationOutcome;
+import com.foundations.soil.amendment.AmendmentDoseUnit;
+import com.foundations.soil.soil.SoilDoseTransaction;
+import com.foundations.soil.soil.SoilManager;
 import com.foundations.soil.registry.SoilFluids;
 import com.foundations.soil.soil.SoilTargeting;
 import net.minecraft.ChatFormatting;
@@ -43,19 +46,41 @@ public final class LiquidAmendmentUseEvents {
         }
         int requested = (int) Math.min(candidate.amount(), Math.max(1, Math.min(Integer.MAX_VALUE, Math.floor(definition.maxSingleAmount()))));
         String container = String.valueOf(BuiltInRegistries.ITEM.getKey(event.getItemStack().getItem()));
-        try (Transaction transaction = Transaction.openRoot()) {
-            int taken = handler.extract(candidate.slot(), candidate.resource(), requested, transaction);
-            if (taken <= 0) return;
-            var receipt = FoundationsSoilApi.applyLiquidAmendment(player.level(), target.get(), candidate.family().amendmentId(),
-                taken, 1.0, "container:" + container + ":player:" + player.getUUID());
-            // Creative use deliberately rolls the container exchange back while retaining the soil dose.
-            if (!player.getAbilities().instabuild) transaction.commit();
-            player.sendOverlayMessage(Component.literal(definition.displayName() + " applied | " + taken + " mB | normalized dose "
-                + String.format(java.util.Locale.ROOT, "%.2f", receipt.normalizedDose())).withStyle(ChatFormatting.GREEN));
+        SoilDoseTransaction dose = null;
+        AmendmentApplicationOutcome receipt;
+        int taken;
+        try {
+            dose = SoilManager.prepareTransactionalDose(player.level(), target.get(), definition,
+                "container:" + container + ":player:" + player.getUUID());
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (player.getAbilities().instabuild) {
+                    // Probe the real handler in a nested transaction; roll back ONLY the container.
+                    try (Transaction probe = Transaction.open(transaction)) {
+                        taken = handler.extract(candidate.slot(), candidate.resource(), requested, probe);
+                    }
+                } else {
+                    taken = handler.extract(candidate.slot(), candidate.resource(), requested, transaction);
+                }
+                if (taken <= 0) return;
+                if (taken > requested) throw new IllegalStateException("Container returned more fluid than requested");
+                receipt = dose.stage(taken, AmendmentDoseUnit.MILLIBUCKET, 1.0, transaction);
+                transaction.commit();
+            }
         } catch (RuntimeException failure) {
-            FoundationsSoil.LOGGER.error("[Foundations Soil] Liquid application failed; uncommitted container transfer rolled back", failure);
-            player.sendOverlayMessage(Component.literal("Unable to apply liquid amendment: " + failure.getMessage()).withStyle(ChatFormatting.RED));
+            if (dose != null && dose.committed()) {
+                dose.publishCommitted();
+                FoundationsSoil.LOGGER.error("[Foundations Soil] Dose committed, but container completion failed; inspect before retrying", failure);
+                player.sendOverlayMessage(Component.literal("Dose committed; check the container before retrying.").withStyle(ChatFormatting.RED));
+            } else {
+                FoundationsSoil.LOGGER.error("[Foundations Soil] Liquid transfer aborted; no staged soil dose retained", failure);
+                player.sendOverlayMessage(Component.literal("Liquid amendment was not applied; transfer aborted.").withStyle(ChatFormatting.RED));
+            }
+            return;
         }
+        // Neither observers nor successful-use messages can run on speculative transfer state.
+        dose.publishCommitted();
+        player.sendOverlayMessage(Component.literal(definition.displayName() + " applied | " + taken + " mB | normalized dose "
+            + String.format(java.util.Locale.ROOT, "%.2f", receipt.normalizedDose())).withStyle(ChatFormatting.GREEN));
     }
     private static Candidate findCandidate(ResourceHandler<FluidResource> handler) {
         for (int slot = 0; slot < handler.size(); slot++) {

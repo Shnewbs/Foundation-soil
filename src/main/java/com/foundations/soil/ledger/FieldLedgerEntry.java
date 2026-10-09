@@ -280,6 +280,7 @@ public final class FieldLedgerEntry {
     }
 
     public static FieldLedgerEntry load(CompoundTag tag) {
+        com.foundations.soil.storage.SavedTagChecks.optionalType(tag, "physical", Tag.TAG_COMPOUND);
         FieldLedgerEntry entry = new FieldLedgerEntry(
             tag.getString("dimension").orElse(""), tag.getInt("cell_x").orElse(0), tag.getInt("cell_z").orElse(0), tag.getInt("sample_y").orElse(0),
             tag.getLong("first_discovered_tick").orElse(0L)
@@ -287,7 +288,7 @@ public final class FieldLedgerEntry {
         entry.lastProbeDay = com.foundations.soil.storage.NbtAccess.contains(tag, "last_probe_day", Tag.TAG_LONG) ? tag.getLong("last_probe_day").orElse(0L) : -1;
         if (com.foundations.soil.storage.NbtAccess.contains(tag, "physical", Tag.TAG_COMPOUND)) {
             CompoundTag physical = tag.getCompound("physical").orElseThrow(() -> new IllegalStateException("Expected saved compound"));
-            entry.texture = new com.foundations.soil.soil.SoilTexture(physical.getDouble("sand").orElse(0.0), physical.getDouble("silt").orElse(0.0), physical.getDouble("clay").orElse(0.0));
+            entry.texture = new com.foundations.soil.soil.SoilTexture(com.foundations.soil.storage.SavedTagChecks.requiredDouble(physical, "sand"), com.foundations.soil.storage.SavedTagChecks.requiredDouble(physical, "silt"), com.foundations.soil.storage.SavedTagChecks.requiredDouble(physical, "clay"));
         }
         entry.trend.load(com.foundations.soil.storage.SavedTagChecks.compounds(tag, "trend", false));
         entry.lastScannedTick = Math.max(0, tag.getLong("last_scanned_tick").orElse(0L));

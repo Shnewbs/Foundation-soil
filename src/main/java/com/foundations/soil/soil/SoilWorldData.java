@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import com.foundations.soil.storage.SavedTagChecks;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -15,6 +16,16 @@ import net.minecraft.world.level.saveddata.SavedData;
 public final class SoilWorldData extends com.foundations.soil.storage.SoilSavedData {
     public static final String DATA_NAME = "foundations_soil_cells";
     private final Map<Long, SoilCell> cells = new HashMap<>();
+    // Only cells participating in an open transfer have a journal; never serialized.
+    private final Map<Long, SoilDoseTransaction.CellJournal> doseJournals = new HashMap<>();
+    SoilDoseTransaction.CellJournal doseJournal(SoilCellKey key) {
+        return doseJournals.computeIfAbsent(key.packed(), ignored -> new SoilDoseTransaction.CellJournal(this, key));
+    }
+    void releaseDoseJournal(SoilCellKey key, SoilDoseTransaction.CellJournal journal) {
+        doseJournals.remove(key.packed(), journal);
+    }
+    public int activeDoseJournals() { return doseJournals.size(); }
+
 
     public Optional<SoilCell> get(SoilCellKey key) { return Optional.ofNullable(cells.get(key.packed())); }
     public Optional<SoilCell> getPacked(long packed) { return Optional.ofNullable(cells.get(packed)); }
@@ -24,8 +35,8 @@ public final class SoilWorldData extends com.foundations.soil.storage.SoilSavedD
     public long[] packedKeysSnapshot() { return cells.keySet().stream().mapToLong(Long::longValue).toArray(); }
 
     public static SoilWorldData load(CompoundTag root, HolderLookup.Provider registries) {
-        int schema = com.foundations.soil.storage.NbtAccess.contains(root, "schema", Tag.TAG_INT) ? root.getInt("schema").orElse(0) : 1;
-        int model = com.foundations.soil.storage.NbtAccess.contains(root, "model", Tag.TAG_INT) ? root.getInt("model").orElse(0) : 1;
+        int schema = SavedTagChecks.version(root, "schema", 1, SoilCell.SCHEMA_VERSION);
+        int model = SavedTagChecks.version(root, "model", 1, SoilCell.MODEL_VERSION);
         if (schema > SoilCell.SCHEMA_VERSION) throw new IllegalStateException("Foundations Soil save schema " + schema + " is newer than supported schema " + SoilCell.SCHEMA_VERSION);
         if (model > SoilCell.MODEL_VERSION) throw new IllegalStateException("Foundations Soil model " + model + " is newer than supported model " + SoilCell.MODEL_VERSION);
 

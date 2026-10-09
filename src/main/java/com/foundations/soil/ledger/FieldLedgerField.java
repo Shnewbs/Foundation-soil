@@ -36,7 +36,9 @@ public final class FieldLedgerField {
     }
 
     public static FieldLedgerField load(CompoundTag tag) {
-        FieldLedgerField field = new FieldLedgerField(tag.getInt("id").orElse(0), tag.getString("name").orElse(""));
+        int id = com.foundations.soil.storage.SavedTagChecks.requiredInt(tag, "id");
+        if (id < 1) throw new IllegalStateException("Invalid saved field ID: " + id);
+        FieldLedgerField field = new FieldLedgerField(id, tag.getString("name").orElse(""));
         field.note = clean(tag.getString("note").orElse(""), 256);
         field.favorite = tag.getBoolean("favorite").orElse(false);
         return field;

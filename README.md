@@ -1,11 +1,17 @@
 # Foundations Soil — native 26.1.2 development port
 
-**`0.1.0-beta-port.1` · Minecraft 26.1.2 · NeoForge 26.1.2.114 · Java 25**
+**`0.1.0-beta-port.2` · Minecraft 26.1.2 · NeoForge 26.1.2.114 · Java 25**
 
 The full 1.21.1 `0.1.0-beta` Soil feature implementation has been migrated to native
 26.1.2 APIs. **This is a compiled development port, not a validated playable modpack.**
 TFC and Foundations Framework remain hard runtime dependencies. Their native
 26.1.2 builds must be available and validated before gameplay testing can pass.
+
+## Latest native checkpoint
+
+Port.2 adds reversible liquid/soil dosing on the same NeoForge transaction,
+post-commit-only notifications, stale-snapshot rejection, and stricter corrupt-save
+validation. See [port.2 notes and exact limits](docs/ports/26.1.2/PORT2_RELEASE_NOTES.md).
 
 ## Included
 
@@ -25,12 +31,12 @@ TFC's calendar, climate, hydration, crop growth or stored N/P/K.
 Windows: `build_mod.bat` or the equivalent `gradlew.bat` command. A first build
 requires network access. The main output is:
 
-`build/libs/foundations_soil-26.1.2-0.1.0-beta-port.1.jar`
+`build/libs/foundations_soil-26.1.2-0.1.0-beta-port.2.jar`
 
 The sources JAR and complete source archive are development files, not mods to put
 into a game's `mods` folder.
 
-**74 native model tests pass**; three TFC-dependent tests are excluded from that
+**95 native model tests pass**; three TFC-dependent tests are excluded from that
 suite and await real runtime dependencies. Model tests do not start the modpack.
 The 1k/10k/50k benchmarks check model/storage round trips, not live server TPS.
 
@@ -49,7 +55,7 @@ are included. Patchouli/JEI runtime pins follow the inspected target TFC branch.
 ## Validation and safe testing
 
 Read [the exact evidence and open gates](docs/ports/26.1.2/VALIDATION.md) and
-[release notes](docs/ports/26.1.2/RELEASE_NOTES.md). Full game launches, actual TFC API
+[current release notes](docs/ports/26.1.2/PORT2_RELEASE_NOTES.md). Full game launches, actual TFC API
 binding/Mixins, crop/fluids, rendering/input, multiplayer and seasonal tests remain
 unexecuted. **Do not use this development build in a production world.**
 
@@ -60,10 +66,10 @@ network protocol remains 8 within the strictly matching native platform.
 
 ## Branch and release policy
 
-- `main`: retain Minecraft **1.21.1**, published `0.1.0-beta`.
+- `main`: frozen **1.21.1** reference; outside our active maintenance scope. Do not modify it.
 - `mc-26.1.2`: this native development port; next playable integration target.
 - `mc-26.3`: planned parallel development toward **26.4**; no Soil binary included here.
 
 Publish each platform's own JAR and source as a GitHub Release. This port uses
-`mc-26.1.2-v0.1.0-beta-port.1`, a development prerelease, never the stable/latest build.
+`mc-26.1.2-v0.1.0-beta-port.2`, a development prerelease, never the stable/latest build.
 Earlier `docs/beta/` validation records describe **1.21.1**, not native 26.x acceptance.

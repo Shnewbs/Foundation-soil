@@ -20,7 +20,7 @@ import org.slf4j.Logger;
 @Mod(FoundationsSoil.MOD_ID)
 public final class FoundationsSoil {
     public static final String MOD_ID = "foundations_soil";
-    public static final String VERSION = "0.1.0-beta-port.1";
+    public static final String VERSION = "0.1.0-beta-port.2";
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public FoundationsSoil(IEventBus modBus, ModContainer container) {

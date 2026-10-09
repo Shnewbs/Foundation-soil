@@ -75,6 +75,28 @@ public final class SoilManager {
             SoilConfig.AMENDMENT_DIMINISHING_STRENGTH.get(), SoilConfig.effectiveAmendmentStrength(),
             SoilConfig.MAX_PENDING_AMENDMENT_RELEASES.get());
         data(level).setDirty();
+        publishAmendment(level, soilPos, amendment, outcome, source, cell);
+        return new AmendmentApplyResult(cell, outcome);
+    }
+
+    /** Resolve/calendar-catch-up outside the native transfer; the dose itself remains reversible. */
+    public static SoilDoseTransaction prepareTransactionalDose(ServerLevel level, BlockPos soilPos,
+                                                               AmendmentDefinition amendment, String source) {
+        if (!SoilConfig.AMENDMENT_ENGINE_ENABLED.get()) throw new IllegalStateException("Foundations Soil amendment engine is disabled by server config");
+        if (amendment == null) throw new IllegalArgumentException("amendment cannot be null");
+        SoilCell cell = getOrCreate(level, soilPos);
+        BlockPos target = soilPos.immutable();
+        var settings = new SoilDoseTransaction.Settings(TfcRuntime.ticks(), TfcRuntime.days(),
+            SoilConfig.AMENDMENT_DIMINISHING_STRENGTH.get(), SoilConfig.effectiveAmendmentStrength(),
+            SoilConfig.MAX_PENDING_AMENDMENT_RELEASES.get(), SoilConfig.MAX_NORMALIZED_AMENDMENT_DOSE.get());
+        return new SoilDoseTransaction(data(level), cell, amendment, settings,
+            (committed, outcome) -> publishAmendment(level, target, amendment, outcome, source, committed));
+    }
+
+    private static void publishAmendment(ServerLevel level, BlockPos soilPos, AmendmentDefinition amendment,
+                                         AmendmentApplicationOutcome outcome, String source, SoilCell cell) {
+        double amount = outcome.amount(), concentration = outcome.concentration();
+        AmendmentDoseUnit unit = outcome.unit();
         var snapshot = SoilSnapshots.from(cell);
         String actualSource = source == null || source.isBlank() ? "unknown" : source;
         SoilEvents.bus().post(new SoilEvents.AmendmentApplied(level.dimension().identifier(), soilPos.immutable(),
@@ -87,7 +109,6 @@ public final class SoilManager {
         String event = String.format(java.util.Locale.ROOT, "Applied %s: %.2f %s @ %.2fx%s", amendment.displayName(),
             amount, unit.shortName(), concentration, outcome.overApplied() ? " [OVERAPPLIED]" : "");
         FieldLedgerManager.refreshAllDiscovered(level.getServer(), level, cell, event, outcome.overApplied());
-        return new AmendmentApplyResult(cell, outcome);
     }
 
     public record AmendmentApplyResult(SoilCell cell, AmendmentApplicationOutcome outcome) {}

@@ -1,3 +1,13 @@
+# 0.1.0-beta-port.2 — native transaction and save hardening
+
+26.1.2 only. Added shared fluid/soil transaction rollback, creative extraction probes,
+one-shot post-commit publication, stale-snapshot rejection and stricter malformed-save
+headers/coordinates/measurements/field IDs. Added 21 model regression tests (95 total).
+The 1.21.1 branch and assets are untouched and outside active maintenance scope.
+See [complete notes and limits](docs/ports/26.1.2/PORT2_RELEASE_NOTES.md).
+
+---
+
 # 0.1.0-beta-port.1 — Minecraft 26.1.2
 
 Migrated the full beta source to native Minecraft 26.1.2 / NeoForge 26.1.2.114 / Java 25: persistence codecs, identifiers, screen/input APIs, item/fluid definitions and transactions, plus a mandatory TFC runtime boundary. All main sources compile and 74 native model tests pass; 1k/10k/50k compressed round trips preserve every cell. Three TFC-dependent checks and all actual game/runtime acceptance remain unexecuted. No old dependency binary, target stub, or vanilla fallback is used.

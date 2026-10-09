@@ -12,6 +12,7 @@ import com.foundations.soil.crop.CropFamily;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.nbt.CompoundTag;
+import com.foundations.soil.storage.SavedTagChecks;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
@@ -430,22 +431,26 @@ public final class SoilCell {
     }
 
     public static SoilCell load(CompoundTag tag) {
-        int schema = com.foundations.soil.storage.NbtAccess.contains(tag, "schema", Tag.TAG_INT) ? tag.getInt("schema").orElse(0) : 1;
-        int model = com.foundations.soil.storage.NbtAccess.contains(tag, "model", Tag.TAG_INT) ? tag.getInt("model").orElse(0) : 1;
+        int schema = SavedTagChecks.version(tag, "schema", 1, SCHEMA_VERSION);
+        int model = SavedTagChecks.version(tag, "model", 1, MODEL_VERSION);
         if (schema > SCHEMA_VERSION) throw new IllegalStateException("Foundations Soil cell schema " + schema + " is newer than supported schema " + SCHEMA_VERSION);
         if (model > MODEL_VERSION) throw new IllegalStateException("Foundations Soil cell model " + model + " is newer than supported model " + MODEL_VERSION);
 
+        SavedTagChecks.optionalType(tag, "physical", Tag.TAG_COMPOUND);
+        SavedTagChecks.optionalType(tag, "monitoring", Tag.TAG_BYTE);
+        // Validate even unmonitored histories, rather than dropping malformed retained data.
+        SavedTagChecks.compounds(tag, "trend", false);
         SoilProfile profile = new SoilProfile(
-            tag.getDouble("organic_matter").orElse(0.0), tag.getDouble("ph").orElse(0.0), tag.getDouble("drainage").orElse(0.0),
-            tag.getDouble("compaction").orElse(0.0), tag.getDouble("structure").orElse(0.0), tag.getDouble("biology").orElse(0.0),
-            tag.getDouble("salinity").orElse(0.0)
+            SavedTagChecks.requiredDouble(tag, "organic_matter"), SavedTagChecks.requiredDouble(tag, "ph"), SavedTagChecks.requiredDouble(tag, "drainage"),
+            SavedTagChecks.requiredDouble(tag, "compaction"), SavedTagChecks.requiredDouble(tag, "structure"), SavedTagChecks.requiredDouble(tag, "biology"),
+            SavedTagChecks.requiredDouble(tag, "salinity")
         );
         int sampleY = com.foundations.soil.storage.NbtAccess.contains(tag, "sample_y", Tag.TAG_INT) ? tag.getInt("sample_y").orElse(0) : 64;
         long simDay = com.foundations.soil.storage.NbtAccess.contains(tag, "last_simulated_day", Tag.TAG_LONG) ? tag.getLong("last_simulated_day").orElse(0L) : 0L;
-        SoilCell cell = new SoilCell(tag.getInt("cell_x").orElse(0), tag.getInt("cell_z").orElse(0), sampleY, profile, tag.getLong("last_tfc_tick").orElse(0L), simDay);
+        SoilCell cell = new SoilCell(SavedTagChecks.requiredInt(tag, "cell_x"), SavedTagChecks.requiredInt(tag, "cell_z"), sampleY, profile, tag.getLong("last_tfc_tick").orElse(0L), simDay);
         if (com.foundations.soil.storage.NbtAccess.contains(tag, "physical", Tag.TAG_COMPOUND)) {
             CompoundTag physical = tag.getCompound("physical").orElseThrow(() -> new IllegalStateException("Expected saved compound"));
-            cell.initializePhysical(new SoilTexture(physical.getDouble("sand").orElse(0.0), physical.getDouble("silt").orElse(0.0), physical.getDouble("clay").orElse(0.0)), physical.getString("source").orElse(""));
+            cell.initializePhysical(new SoilTexture(SavedTagChecks.requiredDouble(physical, "sand"), SavedTagChecks.requiredDouble(physical, "silt"), SavedTagChecks.requiredDouble(physical, "clay")), physical.getString("source").orElse(""));
         }
         cell.plantingKnownMask = tag.getInt("planting_known").orElse(0) & 0xffff;
         cell.plantingPresentMask = tag.getInt("planting_present").orElse(0) & cell.plantingKnownMask;

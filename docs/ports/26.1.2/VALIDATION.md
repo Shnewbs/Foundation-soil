@@ -1,3 +1,25 @@
+# Current checkpoint: 0.1.0-beta-port.2
+
+All main/test sources compiled locally on Java 25 against the native 26.1.2 classpath.
+**95 model tests passed** (21 new; zero failures, skips or aborts). Three TFC-dependent
+checks remain deferred outside this suite. The new 1k/10k/50k compressed save/load
+benchmark passed with exact cell comparisons. Runtime acceptance remains open.
+
+Transaction coverage: root abort/commit, nested abort/commit, parent failure, creative
+container probing, stale snapshots, journal reuse, invalid dosing and failed post-commit
+notifications. Save coverage: malformed/nonpositive/future headers, legacy header absence,
+missing coordinates/measurements, malformed physical data, invalid field IDs and repeated
+native-storage rejection without overwriting the source file.
+
+See [port.2 notes](PORT2_RELEASE_NOTES.md). The native release workflow must independently
+rebuild the source, run the suite, and validate packaged version/classfile/dependencies
+before publishing. Its attached evidence is authoritative for that run.
+
+The following **port.1 record is historical** and does not supersede the test count above.
+No 1.21.1 source or assets change in this checkpoint; 1.21.1 is outside our maintenance scope.
+
+---
+
 # Native 26.1.2 port validation — 0.1.0-beta-port.1
 
 This is a **compiled development port**, not a validated playable modpack. The

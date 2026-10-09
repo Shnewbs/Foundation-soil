@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import com.foundations.soil.storage.SavedTagChecks;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -32,7 +33,7 @@ public final class FieldLedgerData extends com.foundations.soil.storage.SoilSave
     public int playerCount() { return ledgers.size(); }
 
     public static FieldLedgerData load(CompoundTag root, HolderLookup.Provider registries) {
-        int schema = com.foundations.soil.storage.NbtAccess.contains(root, "schema", Tag.TAG_INT) ? root.getInt("schema").orElse(0) : 1;
+        int schema = SavedTagChecks.version(root, "schema", 1, SCHEMA_VERSION);
         if (schema > SCHEMA_VERSION) {
             throw new IllegalStateException("Foundations Field Ledger schema " + schema + " is newer than supported schema " + SCHEMA_VERSION);
         }
