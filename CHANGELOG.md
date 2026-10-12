@@ -1,3 +1,16 @@
+# 0.1.0-beta-port.3 — Minecraft 26.1.2
+
+- Required Foundations Framework registration now fails startup unless the bridge is ACTIVE.
+- Added one-shot TFC API preflight covering calendar, climate, farmland, chunk data, crop and livestock bindings.
+- Added `/fsoil doctor` for server-side dependency/API diagnostics.
+- Corrected stale runtime self-test expectations to Soil schema/model 4/4 and Field Ledger schema 5.
+- Added integration-readiness regression tests and a safe missing-ModList path.
+- Local Java 25 compilation passes for main/test sources; 98 model tests pass with zero failures/skips/aborts.
+- 1k/10k/50k compressed model/storage round trips pass. These are not live TPS results.
+- Full TFC/Framework client/dedicated-server startup remains blocked by dependency readiness.
+
+---
+
 # 0.1.0-beta-port.2 — native transaction and save hardening
 
 26.1.2 only. Added shared fluid/soil transaction rollback, creative extraction probes,
