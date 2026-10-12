@@ -23,7 +23,7 @@ import com.foundations.soil.integration.TfcRuntime;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.fml.ModList;
 
-/** Read-only world self-test for the 0.0.3a amendment engine. */
+/** Read-only runtime self-test for the native 26.1.2 Soil integration. */
 public final class SoilSelfTest {
     private SoilSelfTest() {}
 
@@ -36,8 +36,8 @@ public final class SoilSelfTest {
             return cells + " persistent cell(s)";
         });
 
-        check(checks, "Schema 3/3", () -> {
-            if (SoilCell.SCHEMA_VERSION != 3 || SoilCell.MODEL_VERSION != 3) {
+        check(checks, "Schema 4/4", () -> {
+            if (SoilCell.SCHEMA_VERSION != 4 || SoilCell.MODEL_VERSION != 4) {
                 throw new IllegalStateException("unexpected schema/model " + SoilCell.SCHEMA_VERSION + "/" + SoilCell.MODEL_VERSION);
             }
             SoilCell sample = new SoilCell(2, -3, 64, new SoilProfile(.31, 6.57, .62, .13, .60, .48, .03), 42L, 7L);
@@ -50,7 +50,7 @@ public final class SoilSelfTest {
 
         check(checks, "TFC Calendar", () -> {
             if (!ModList.get().isLoaded("tfc")) throw new IllegalStateException("TFC not loaded");
-            return "day=" + TfcRuntime.days();
+            return "day=" + TfcRuntime.days() + " | " + TfcRuntime.diagnostic();
         });
 
         check(checks, "Definitions", () -> {
@@ -128,7 +128,7 @@ public final class SoilSelfTest {
             int cells = FieldLedgerManager.entryCount(player);
             int fields = FieldLedgerManager.fieldCount(player);
             if (cells < 0 || fields < 0) throw new IllegalStateException("negative ledger count");
-            if (FieldLedgerData.SCHEMA_VERSION != 4) throw new IllegalStateException("unexpected Field Ledger schema " + FieldLedgerData.SCHEMA_VERSION);
+            if (FieldLedgerData.SCHEMA_VERSION != 5) throw new IllegalStateException("unexpected Field Ledger schema " + FieldLedgerData.SCHEMA_VERSION);
             return cells + " discovered / " + fields + " field(s); schema=" + FieldLedgerData.SCHEMA_VERSION;
         });
 
