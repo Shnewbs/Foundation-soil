@@ -76,6 +76,13 @@ public final class TfcRuntime {
         }
     }
     public static void bootstrap() { if (access() == null) throw incompatible(null); }
+
+    /** Resolves every TFC symbol Soil relies on and returns a concise runtime diagnostic. */
+    public static String diagnostic() {
+        Access value = access();
+        if (value == null) throw incompatible(null);
+        return "calendar+climate+farmland+chunkdata+crop+livestock API READY";
+    }
     public static long ticks() { try { return (long) access().ticks.invokeExact(); } catch (Throwable e) { throw incompatible(e); } }
     public static long days() { try { return (long) access().days.invokeExact(); } catch (Throwable e) { throw incompatible(e); } }
     public static double temperature(Level l, BlockPos p) { try { return (double) access().temperature.invokeExact(l,p); } catch (Throwable e) { throw incompatible(e); } }
