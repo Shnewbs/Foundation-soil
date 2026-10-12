@@ -14,8 +14,8 @@ import net.minecraft.resources.Identifier;
 import net.neoforged.fml.ModList;
 
 /**
- * Best-effort bridge to Foundations Framework without making the Framework JAR a compile-time requirement.
- * This keeps standalone source builds simple while exposing stable services when Framework is present.
+ * Runtime bridge to the required Foundations Framework without making its JAR a compile-time requirement.
+ * Model-only builds remain isolated, while real mod startup must reach ACTIVE registration.
  */
 public final class FrameworkSoilBridge {
     private static final Identifier MODULE_ID = Identifier.fromNamespaceAndPath(FoundationsSoil.MOD_ID, "soil");
@@ -60,7 +60,15 @@ public final class FrameworkSoilBridge {
         } catch (Throwable error) {
             status = Status.FAILED;
             detail = error.getClass().getSimpleName() + ": " + safeMessage(error);
-            FoundationsSoil.LOGGER.warn("[Foundations Soil] Framework bridge could not complete; Soil remains operational: {}", detail);
+            FoundationsSoil.LOGGER.error("[Foundations Soil] Framework bridge could not complete: {}", detail);
+        }
+    }
+
+    /** Required runtime gate: Soil must not continue with a missing/partial Framework bridge. */
+    public static synchronized void bootstrapRequired() {
+        bootstrap();
+        if (status != Status.ACTIVE) {
+            throw new IllegalStateException("Foundations Framework integration is required but not ACTIVE: " + status + " — " + detail);
         }
     }
 
