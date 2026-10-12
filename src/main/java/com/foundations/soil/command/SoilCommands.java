@@ -56,6 +56,8 @@ public final class SoilCommands {
                 .executes(context -> hooks(context.getSource().getPlayerOrException())))
             .then(Commands.literal("selftest")
                 .executes(context -> selftest(context.getSource().getPlayerOrException())))
+            .then(Commands.literal("doctor")
+                .executes(context -> doctor(context.getSource().getPlayerOrException())))
             .then(Commands.literal("definitions")
                 .executes(context -> definitions(context.getSource().getPlayerOrException()))
                 .then(Commands.literal("reload")
@@ -236,6 +238,34 @@ public final class SoilCommands {
         player.sendSystemMessage(Component.literal("inputDispatches=" + SoilInputHooks.dispatchCount()
             + " | inputFailures=" + SoilInputHooks.failureCount()).withStyle(ChatFormatting.DARK_GRAY));
         return 1;
+    }
+
+    private static int doctor(ServerPlayer player) {
+        player.sendSystemMessage(Component.literal("Foundations Soil " + FoundationsSoil.VERSION + " Integration Doctor")
+            .withStyle(ChatFormatting.GOLD));
+        int failures = 0;
+        try {
+            player.sendSystemMessage(Component.literal("TFC: " + com.foundations.soil.integration.TfcRuntime.diagnostic())
+                .withStyle(ChatFormatting.GREEN));
+        } catch (RuntimeException error) {
+            failures++;
+            player.sendSystemMessage(Component.literal("TFC: FAIL — " + error.getMessage()).withStyle(ChatFormatting.RED));
+        }
+        try {
+            FrameworkSoilBridge.bootstrapRequired();
+            player.sendSystemMessage(Component.literal("Framework: ACTIVE — " + FrameworkSoilBridge.detail())
+                .withStyle(ChatFormatting.GREEN));
+        } catch (RuntimeException error) {
+            failures++;
+            player.sendSystemMessage(Component.literal("Framework: FAIL — " + error.getMessage()).withStyle(ChatFormatting.RED));
+        }
+        player.sendSystemMessage(Component.literal("Soil schema/model=" + SoilCell.SCHEMA_VERSION + "/" + SoilCell.MODEL_VERSION
+            + " | ledger=" + com.foundations.soil.ledger.FieldLedgerData.SCHEMA_VERSION
+            + " | protocol=8 | serverThread=" + player.level().getServer().isSameThread())
+            .withStyle(ChatFormatting.GRAY));
+        player.sendSystemMessage(Component.literal(failures == 0 ? "DOCTOR: READY FOR RUNTIME TESTS" : "DOCTOR: BLOCKED (" + failures + " dependency/API failure(s))")
+            .withStyle(failures == 0 ? ChatFormatting.GREEN : ChatFormatting.RED));
+        return failures == 0 ? 1 : 0;
     }
 
     private static int selftest(ServerPlayer player) {
