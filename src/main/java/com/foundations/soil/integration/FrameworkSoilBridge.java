@@ -31,7 +31,7 @@ public final class FrameworkSoilBridge {
         attempted = true;
         SERVICES.clear();
 
-        if (!ModList.get().isLoaded("foundations_framework")) {
+        ModList mods = ModList.get();\n        if (mods == null || !mods.isLoaded("foundations_framework")) {
             status = Status.FRAMEWORK_MISSING;
             detail = "Foundations Framework mod is not loaded";
             return;
